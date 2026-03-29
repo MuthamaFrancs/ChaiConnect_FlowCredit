@@ -30,21 +30,14 @@ export async function fetchFarmer(id: string) {
 }
 
 export async function fetchStats() {
-  type Stats = {
-    farmers: number
-    kgMonth: number
-    disbursedMonth: number
-    pendingPayments: number
-  }
+  type Stats = { farmers: number; kgMonth: number; disbursedMonth: number; pendingPayments: number }
   const remote = await api<Stats>('/api/stats')
-  return (
-    remote ?? {
-      farmers: FARMERS.length,
-      kgMonth: 48230,
-      disbursedMonth: 2400000,
-      pendingPayments: RECENT_PAYMENTS.filter((p) => p.status === 'Pending').length,
-    }
-  )
+  return remote ?? {
+    farmers: FARMERS.length,
+    kgMonth: 48230,
+    disbursedMonth: 2400000,
+    pendingPayments: RECENT_PAYMENTS.filter((p) => p.status === 'Pending').length,
+  }
 }
 
 export async function fetchRecentPayments() {
@@ -77,6 +70,35 @@ export async function fetchChartActivity() {
   return remote?.points ?? CHART_DELIVERY_ACTIVITY
 }
 
+/** Real B2C disbursement — calls Daraja sandbox (with simulated fallback) */
+export async function postDisburse(body: {
+  phone: string
+  amount: number
+  farmerId?: string
+  farmerName?: string
+  remarks?: string
+}) {
+  try {
+    const r = await fetch('/api/mpesa/disburse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!r.ok) return null
+    return (await r.json()) as {
+      ok: boolean
+      ref: string
+      simulated: boolean
+      message: string
+      steps: { label: string; ms: number }[]
+      payload: Record<string, unknown>
+    }
+  } catch {
+    return null
+  }
+}
+
+/** Legacy simulated B2C — used as fallback if /api/mpesa/disburse is unreachable */
 export async function postSimulateB2C(body: Record<string, unknown>) {
   try {
     const r = await fetch('/api/mpesa/simulate-b2c', {
@@ -85,10 +107,7 @@ export async function postSimulateB2C(body: Record<string, unknown>) {
       body: JSON.stringify(body),
     })
     if (!r.ok) return null
-    return (await r.json()) as {
-      steps: { label: string; ms: number }[]
-      payload: Record<string, unknown>
-    }
+    return (await r.json()) as { steps: { label: string; ms: number }[]; payload: Record<string, unknown> }
   } catch {
     return {
       steps: [

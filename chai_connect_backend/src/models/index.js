@@ -1,29 +1,18 @@
+/**
+ * Models index — NO foreign key constraints.
+ * farmerId is a plain string field, not a DB-level FK.
+ * This avoids type conflicts with any pre-existing Neon tables
+ * and works with the string IDs used throughout the app.
+ */
 const sequelize = require('../config/database');
-const Farmer = require('./Farmer');
-const Delivery = require('./Delivery');
-const Loan = require('./Loan');
-const Payment = require('./Payment');
+const Farmer    = require('./Farmer');
+const Delivery  = require('./Delivery');
+const Loan      = require('./Loan');
+const Payment   = require('./Payment');
+const MpesaFeed = require('./MpesaFeed');
+const Complaint = require('./Complaint');
 
-// 1. Farmer & Deliveries
-Farmer.hasMany(Delivery);
-Delivery.belongsTo(Farmer);
+// No Sequelize associations — farmerId is a plain string reference.
+// This keeps sync() clean and avoids FK type conflicts.
 
-// 2. Farmer & Loans
-Farmer.hasMany(Loan);
-Loan.belongsTo(Farmer);
-
-// 3. Farmer & Payments (General payouts)
-Farmer.hasMany(Payment);
-Payment.belongsTo(Farmer);
-
-// 4. Loan & Payments (Linking repayments to a specific loan)
-Loan.hasMany(Payment);
-Payment.belongsTo(Loan);
-
-module.exports = {
-  sequelize,
-  Farmer,
-  Delivery,
-  Loan,
-  Payment
-};
+module.exports = { sequelize, Farmer, Delivery, Loan, Payment, MpesaFeed, Complaint };
