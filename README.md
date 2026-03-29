@@ -14,12 +14,11 @@
 
 ---
 
-## Live demo (mandatory — replace placeholders)
+## Live demo 
 
-- **Live web app:** REPLACE_ME — e.g. deploy `frontend/` to Vercel/Netlify and point `/api` to your backend.
-- **Drive / assets (optional):** REPLACE_ME — zip of `frontend/dist`, `.env.example`, short video if needed.
+- **Live web app:** https://chaiconnects.vercel.app/.
+- **Drive / assets :** https://drive.google.com/drive/folders/1-6lkr_GvSyRf2VtywiHGLc29TTeVJ0Ca?usp=drive_link.
 
-Update this README with real links before final submission.
 
 ---
 
