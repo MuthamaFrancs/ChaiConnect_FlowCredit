@@ -1,64 +1,61 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { MpesaBadge } from '../components/MpesaBadge'
-import { PaymentStatusPill } from '../components/PaymentStatusPill'
-import type { PaymentStatus } from '../types'
+import { Money } from '../components/Money'
+import { useApp } from '../context/AppProvider'
 import { PortalCard, PortalPageTitle } from './PortalChrome'
-
-const items: { dt: string; status: PaymentStatus; amt: number; id: string }[] = [
-  { dt: '2025-03-28', status: 'Paid', amt: 18500, id: 'SLQ1ABCDEF' },
-  { dt: '2025-03-10', status: 'Pending', amt: 3200, id: 'PEND-303' },
-]
+import { fetchFarmerPayments } from '../lib/api'
 
 export function PortalPayments() {
-  const [f, setF] = useState<'All' | 'Paid' | 'Pending' | 'Deductions'>('All')
+  const { t } = useApp()
+  const farmerId = 'wanjiku'
+  const [rows, setRows] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    void (async () => {
+      setLoading(true)
+      const data = await fetchFarmerPayments(farmerId)
+      setRows(data)
+      setLoading(false)
+    })()
+  }, [])
 
   return (
     <div>
-      <PortalPageTitle title="Payments" subtitle="Timeline · filter by status (same cues as cooperative ledger)" />
-      <PortalCard noPadding style={{ marginBottom: 12 }}>
-        <div style={{ padding: 12, borderBottom: '1px solid rgba(0,0,0,0.06)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {(['All', 'Paid', 'Pending', 'Deductions'] as const).map((x) => (
-            <button
-              key={x}
-              className="btn"
-              type="button"
-              style={{
-                borderRadius: 999,
-                padding: '8px 12px',
-                fontSize: 13,
-                fontFamily: 'var(--font-display)',
-                fontWeight: 700,
-                background: f === x ? 'rgba(82,183,136,0.2)' : 'transparent',
-                borderColor: f === x ? 'var(--fresh)' : 'rgba(0,0,0,0.08)',
-              }}
-              onClick={() => setF(x)}
-            >
-              {x}
-            </button>
-          ))}
-        </div>
-        <div style={{ padding: 12, display: 'grid', gap: 10 }}>
-          {items
-            .filter((i) => f === 'All' || i.status === f || (f === 'Deductions' && i.status === 'Paid'))
-            .map((i) => (
-              <div key={i.id} className="card-surface" style={{ padding: 14, background: 'var(--zebra-a)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
-                  <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>{i.dt}</div>
-                  <PaymentStatusPill status={i.status} />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+      <PortalPageTitle title={t('My payments', 'Malipo yangu')} subtitle={t('M-Pesa backed', 'M-Pesa')} />
+
+      {loading ? (
+        <PortalCard><div style={{ textAlign: 'center', padding: 20, color: 'var(--muted)' }}>Loading…</div></PortalCard>
+      ) : rows.length === 0 ? (
+        <PortalCard>
+          <div style={{ textAlign: 'center', padding: 30, color: 'var(--muted)' }}>
+            {t('No payments recorded yet', 'Hakuna malipo bado')}
+          </div>
+        </PortalCard>
+      ) : (
+        rows.map((p: any) => (
+          <PortalCard key={p.id} style={{ marginBottom: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <MpesaBadge />
-                  <span className="mono" style={{ fontWeight: 900, fontSize: 18 }}>
-                    KSh {i.amt.toLocaleString()}
-                  </span>
+                  <span className="mono" style={{ fontWeight: 900, fontSize: 18 }}><Money amount={Number(p.net || p.amount)} /></span>
                 </div>
-                <div className="mono" style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
-                  {i.id}
+                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+                  Gross: <Money amount={Number(p.amount)} /> · Deductions: <Money amount={Number(p.deductions || 0)} />
                 </div>
               </div>
-            ))}
-        </div>
-      </PortalCard>
+              <span className="chip" style={{
+                background: p.status === 'Paid' ? 'rgba(82,183,136,0.15)' : 'rgba(217,119,6,0.15)',
+                color: p.status === 'Paid' ? '#065f46' : '#92400e',
+              }}>{p.status}</span>
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8, fontFamily: 'var(--font-mono)' }}>
+              {p.time} {p.mpesaRef ? `· Ref: ${p.mpesaRef}` : ''}
+            </div>
+          </PortalCard>
+        ))
+      )}
     </div>
   )
 }

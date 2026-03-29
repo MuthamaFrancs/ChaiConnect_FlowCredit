@@ -439,3 +439,9 @@ label {
 [data-theme='dark'] .skeleton {
   background: linear-gradient(90deg, #243029 0%, #2a3830 40%, #243029 80%);
 }
+
+/* Loading pulse animation for skeleton states */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}

@@ -1,113 +1,74 @@
-import { useMemo, useState } from 'react'
-import { FARMERS, RATES } from '../data/seed'
+import { useEffect, useMemo, useState } from 'react'
+import { PaymentStatusPill } from '../components/PaymentStatusPill'
+import { Money } from '../components/Money'
+import { fetchDeliveries } from '../lib/api'
+import { DELIVERIES } from '../data/seed'
 
-type FeedItem = { id: string; farmer: string; kg: number; grade: 'A' | 'B' | 'C'; est: number }
+type Row = (typeof DELIVERIES)[0]
 
 export function DeliveriesPage() {
-  const [q, setQ] = useState('')
-  const [kg, setKg] = useState('42')
-  const [grade, setGrade] = useState<'A' | 'B' | 'C'>('A')
-  const [feed, setFeed] = useState<FeedItem[]>([
-    { id: 'f1', farmer: 'Wanjiku Kamau', kg: 38, grade: 'A', est: 38 * RATES.A },
-    { id: 'f2', farmer: 'Grace Njeri', kg: 44, grade: 'A', est: 44 * RATES.A },
-  ])
+  const [rows, setRows] = useState<Row[]>([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState<'All' | 'Paid' | 'Pending'>('All')
 
-  const matches = useMemo(
-    () => FARMERS.filter((f) => f.name.toLowerCase().includes(q.toLowerCase()) || f.memberNo.toLowerCase().includes(q.toLowerCase())),
-    [q],
-  )
+  useEffect(() => {
+    void (async () => {
+      setLoading(true)
+      const data = await fetchDeliveries()
+      setRows(data as Row[])
+      setLoading(false)
+    })()
+  }, [])
 
-  function logDelivery() {
-    const f = matches[0] ?? FARMERS[0]
-    const w = Number(kg || '0')
-    const item: FeedItem = {
-      id: `n-${Date.now()}`,
-      farmer: f.name,
-      kg: w,
-      grade,
-      est: w * RATES[grade],
-    }
-    setFeed((prev) => [item, ...prev])
-  }
-
-  const totalKg = feed.reduce((a, b) => a + b.kg, 0)
+  const filtered = useMemo(() => {
+    if (filter === 'All') return rows
+    return rows.filter(r => r.status === filter)
+  }, [filter, rows])
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '2fr 3fr', gap: 16 }}>
-      <div className="card-surface page-enter" style={{ padding: 16 }}>
-        <h3 style={{ marginTop: 0 }}>Log delivery</h3>
-        <label style={{ display: 'block', marginTop: 10 }}>
-          <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--muted)' }}>Farmer search</span>
-          <input className="input" style={{ marginTop: 6 }} value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name or member number" />
-          {!!q && (
-            <div className="card-surface" style={{ marginTop: 8, padding: 8, maxHeight: 160, overflow: 'auto' }}>
-              {matches.slice(0, 6).map((m) => (
-                <div key={m.id} style={{ padding: 6, fontSize: 13 }}>
-                  {m.name} · {m.memberNo}
-                </div>
-              ))}
-            </div>
-          )}
-        </label>
-        <label style={{ display: 'block', marginTop: 12 }}>
-          <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--muted)' }}>Weight (kg)</span>
-          <input className="input" style={{ marginTop: 6, fontSize: 28, fontWeight: 900 }} inputMode="decimal" value={kg} onChange={(e) => setKg(e.target.value)} />
-        </label>
-        <div style={{ marginTop: 12 }}>
-          <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--muted)', marginBottom: 6 }}>Grade</div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {(['A', 'B', 'C'] as const).map((g) => (
-              <button
-                key={g}
-                type="button"
-                className="btn"
-                style={{
-                  borderRadius: 999,
-                  background: grade === g ? (g === 'A' ? 'rgba(82,183,136,0.2)' : g === 'B' ? 'rgba(245,158,11,0.2)' : 'rgba(239,68,68,0.18)') : '#fff',
-                }}
-                onClick={() => setGrade(g)}
-              >
-                Grade {g}
-              </button>
-            ))}
-          </div>
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <h2 style={{ marginBottom: 6 }}>Deliveries</h2>
+          <p style={{ color: 'var(--muted)', margin: 0 }}>
+            {loading ? 'Loading from database…' : `${rows.length} deliveries · Grade monitoring · Payment tracking`}
+          </p>
         </div>
-        <button className="btn btn-primary" type="button" style={{ width: '100%', marginTop: 16, justifyContent: 'center' }} onClick={logDelivery}>
-          Log + notify farmer (SMS simulated)
-        </button>
-      </div>
-      <div className="card-surface page-enter" style={{ padding: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-          <h3 style={{ margin: 0 }}>Today&apos;s feed</h3>
-          <div className="mono" style={{ fontWeight: 800 }}>
-            Today: {totalKg.toLocaleString()} kg · {feed.length} farmers
-          </div>
-        </div>
-        <div style={{ marginTop: 12, display: 'grid', gap: 10 }}>
-          {feed.map((r, idx) => (
-            <div
-              key={r.id}
-              className="card-surface"
-              style={{
-                padding: 12,
-                borderLeft: `4px solid ${r.grade === 'A' ? 'var(--fresh)' : r.grade === 'B' ? '#f59e0b' : '#ef4444'}`,
-                animation: idx === 0 ? 'pageIn 0.35s ease-out both' : undefined,
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-                <div>
-                  <div style={{ fontWeight: 900 }}>{r.farmer}</div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                    {r.kg} kg · Grade {r.grade}
-                  </div>
-                </div>
-                <div className="mono" style={{ fontWeight: 800 }}>
-                  est KSh {r.est.toLocaleString()}
-                </div>
-              </div>
-            </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {(['All', 'Paid', 'Pending'] as const).map(f => (
+            <button key={f} className={`btn ${filter === f ? 'btn-primary' : 'btn-ghost'}`} onClick={() => setFilter(f)} style={{ padding: '6px 12px', fontSize: 13 }}>{f}</button>
           ))}
+          <button className="btn btn-ghost" onClick={async () => { setLoading(true); setRows(await fetchDeliveries() as Row[]); setLoading(false) }}>↻</button>
         </div>
+      </div>
+
+      <div className="card-surface" style={{ padding: 0, overflow: 'hidden', marginTop: 16 }}>
+        <table className="table-zebra" style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead><tr style={{ textAlign: 'left', fontSize: 12, color: 'var(--muted)' }}>
+            <th style={{ padding: 12 }}>Date</th><th>Farmer</th><th>Kg</th><th>Grade</th><th>Rate</th><th>Gross</th><th>Deductions</th><th>Net</th><th>Status</th>
+          </tr></thead>
+          <tbody>
+            {loading ? (
+              [1,2,3,4,5].map(i => <tr key={i}><td colSpan={9} style={{ padding: 14, textAlign: 'center', color: 'var(--muted)' }}>Loading…</td></tr>)
+            ) : filtered.length === 0 ? (
+              <tr><td colSpan={9} style={{ padding: 30, textAlign: 'center', color: 'var(--muted)' }}>No deliveries found</td></tr>
+            ) : (
+              filtered.slice(0, 30).map(d => (
+                <tr key={d.id}>
+                  <td style={{ padding: 12, fontSize: 13 }}>{d.date}</td>
+                  <td style={{ fontWeight: 700 }}>{d.farmerId}</td>
+                  <td className="mono">{Number(d.kg).toFixed(0)} kg</td>
+                  <td><span className="chip" style={{ background: d.grade === 'A' ? 'rgba(82,183,136,0.2)' : d.grade === 'B' ? 'rgba(217,119,6,0.15)' : 'rgba(185,28,28,0.15)' }}>Grade {d.grade}</span></td>
+                  <td className="mono">{d.rate}/kg</td>
+                  <td className="mono"><Money amount={Number(d.gross)} /></td>
+                  <td className="mono"><Money amount={Number(d.deductions)} /></td>
+                  <td className="mono" style={{ fontWeight: 700 }}><Money amount={Number(d.net)} /></td>
+                  <td><PaymentStatusPill status={d.status as any} /></td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   )

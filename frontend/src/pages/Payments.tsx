@@ -1,124 +1,85 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { MpesaBadge } from '../components/MpesaBadge'
 import { Money } from '../components/Money'
+import { PaymentStatusPill } from '../components/PaymentStatusPill'
+import { fetchRecentPayments } from '../lib/api'
+import { RECENT_PAYMENTS } from '../data/seed'
 
-type Card = { id: string; farmer: string; gross: number; deductions: number; payload: string }
-
-const COL1: Card[] = [
-  { id: 'c1', farmer: 'James Mutua', gross: 9200, deductions: 1400, payload: '{}' },
-  { id: 'c2', farmer: 'James Mutua', gross: 7200, deductions: 900, payload: '{}' },
-]
-
-const COL2: Card[] = [
-  { id: 'q1', farmer: 'Grace Njeri', gross: 15000, deductions: 1850, payload: '{"CommandID":"BusinessPayment","Amount":15000}' },
-]
-
-const COL3: Card[] = [
-  { id: 'd1', farmer: 'Wanjiku Kamau', gross: 18500, deductions: 4200, payload: '{"ResultCode":"0"}' },
-]
+type Row = (typeof RECENT_PAYMENTS)[0]
 
 export function PaymentsPage() {
-  const [open, setOpen] = useState(false)
-  const [expand, setExpand] = useState<string | null>(null)
+  const [rows, setRows] = useState<Row[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    void (async () => {
+      setLoading(true)
+      const data = await fetchRecentPayments()
+      setRows(data as Row[])
+      setLoading(false)
+    })()
+  }, [])
+
+  const totalPaid = rows.filter(r => r.status === 'Paid').reduce((a, r) => a + Number(r.net), 0)
+  const totalPending = rows.filter(r => r.status === 'Pending').reduce((a, r) => a + Number(r.amount), 0)
 
   return (
     <div>
-      <h2>Payment management</h2>
-      <p style={{ color: 'var(--muted)', marginTop: 0 }}>Three-column flow · Daraja JSON visible before send</p>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12, marginTop: 16 }}>
-        <KanCol title="Pending approval" tone="#1d4ed8">
-          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-            <button className="btn btn-ghost" type="button">
-              Approve selected
-            </button>
-          </div>
-          {COL1.map((c) => (
-            <PayCard key={c.id} c={c}>
-              <button className="btn btn-primary" type="button" style={{ width: '100%', justifyContent: 'center' }}>
-                Approve
-              </button>
-            </PayCard>
-          ))}
-        </KanCol>
-        <KanCol title="Approved — queued" tone="#b45309">
-          <button className="btn btn-gold" type="button" style={{ width: '100%', marginBottom: 8, justifyContent: 'center' }} onClick={() => setOpen(true)}>
-            <MpesaBadge /> Disburse all
-          </button>
-          {COL2.map((c) => (
-            <PayCard key={c.id} c={c}>
-              <button className="btn btn-ghost" type="button" style={{ width: '100%' }} onClick={() => setExpand((e) => (e === c.id ? null : c.id))}>
-                {expand === c.id ? 'Hide' : 'Show'} B2C payload
-              </button>
-              {expand === c.id && (
-                <pre style={{ marginTop: 10, padding: 12, background: '#0b1220', color: '#baf7cf', borderRadius: 10, overflow: 'auto', fontSize: 12 }}>
-                  {c.payload}
-                </pre>
-              )}
-            </PayCard>
-          ))}
-        </KanCol>
-        <KanCol title="Completed" tone="#166534">
-          {COL3.map((c) => (
-            <PayCard key={c.id} c={c}>
-              <div className="mono" style={{ fontSize: 12, color: 'var(--muted)' }}>
-                M-Pesa SLQ1ABCDEF
-              </div>
-            </PayCard>
-          ))}
-        </KanCol>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <h2 style={{ marginBottom: 6 }}>Payments</h2>
+          <p style={{ color: 'var(--muted)', margin: 0 }}>
+            {loading ? 'Loading…' : `${rows.length} records · M-Pesa backed`}
+          </p>
+        </div>
+        <button className="btn btn-ghost" onClick={async () => { setLoading(true); setRows(await fetchRecentPayments() as Row[]); setLoading(false) }}>↻ Refresh</button>
       </div>
 
-      {open && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 140, display: 'grid', placeItems: 'center', padding: 16 }} onMouseDown={() => setOpen(false)}>
-          <div className="card-surface" style={{ width: 'min(720px,100%)', padding: 18 }} onMouseDown={(e) => e.stopPropagation()}>
-            <strong>Disburse all — confirmation</strong>
-            <p style={{ color: 'var(--muted)' }}>Step tracker: OAuth → B2C → Webhook → Ledger</p>
-            <ol style={{ marginTop: 10, fontFamily: 'var(--font-mono)', fontSize: 13 }}>
-              <li>OAuth token (sandbox)</li>
-              <li>POST /mpesa/b2c/v3/paymentrequest</li>
-              <li>Callback URL</li>
-              <li>Ledger update</li>
-            </ol>
-            <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
-              <button className="btn btn-ghost" type="button" onClick={() => setOpen(false)}>
-                Cancel
-              </button>
-              <button className="btn btn-gold" type="button" onClick={() => setOpen(false)}>
-                <MpesaBadge /> Confirm &amp; send
-              </button>
-            </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginTop: 16 }}>
+        <div className="card-surface" style={{ padding: 16 }}>
+          <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 800 }}>Total Paid (Net)</div>
+          <div className="mono" style={{ fontSize: 24, fontWeight: 900, marginTop: 8, color: 'var(--fresh)' }}>
+            <Money amount={totalPaid} />
           </div>
         </div>
-      )}
-    </div>
-  )
-}
+        <div className="card-surface" style={{ padding: 16 }}>
+          <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 800 }}>Pending</div>
+          <div className="mono" style={{ fontSize: 24, fontWeight: 900, marginTop: 8, color: 'var(--gold)' }}>
+            <Money amount={totalPending} />
+          </div>
+        </div>
+        <div className="card-surface" style={{ padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <MpesaBadge /> <span style={{ fontWeight: 800 }}>M-Pesa Settlement</span>
+        </div>
+      </div>
 
-function KanCol({ title, tone, children }: { title: string; tone: string; children: React.ReactNode }) {
-  return (
-    <div style={{ background: 'rgba(0,0,0,0.03)', borderRadius: 16, padding: 12, border: '1px solid rgba(0,0,0,0.06)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <span style={{ width: 8, height: 8, borderRadius: 999, background: tone }} />
-        <strong>{title}</strong>
+      <div className="card-surface" style={{ padding: 0, overflow: 'hidden', marginTop: 16 }}>
+        <table className="table-zebra" style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead><tr style={{ textAlign: 'left', fontSize: 12, color: 'var(--muted)' }}>
+            <th style={{ padding: 12 }}>Farmer</th><th>Phone</th><th>Amount</th><th>Deductions</th><th>Net</th><th>Status</th><th>Time</th><th>M-Pesa Ref</th>
+          </tr></thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={8} style={{ padding: 30, textAlign: 'center', color: 'var(--muted)' }}>Loading payments…</td></tr>
+            ) : rows.length === 0 ? (
+              <tr><td colSpan={8} style={{ padding: 30, textAlign: 'center', color: 'var(--muted)' }}>No payments yet</td></tr>
+            ) : (
+              rows.map(p => (
+                <tr key={p.id}>
+                  <td style={{ padding: 12, fontWeight: 700 }}>{p.farmer}</td>
+                  <td className="mono" style={{ fontSize: 13 }}>{p.phone}</td>
+                  <td className="mono"><Money amount={p.amount} /></td>
+                  <td className="mono"><Money amount={p.deductions} /></td>
+                  <td className="mono" style={{ fontWeight: 700 }}><Money amount={p.net} /></td>
+                  <td><PaymentStatusPill status={p.status} /></td>
+                  <td style={{ fontSize: 12, color: 'var(--muted)' }}>{p.time}</td>
+                  <td className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>{p.mpesaRef || '—'}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
-      {children}
-    </div>
-  )
-}
-
-function PayCard({ c, children }: { c: Card; children: React.ReactNode }) {
-  return (
-    <div className="card-surface" style={{ padding: 12, marginBottom: 10 }}>
-      <div style={{ fontWeight: 900 }}>{c.farmer}</div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-        <span style={{ color: 'var(--muted)' }}>Gross</span>
-        <Money amount={c.gross} />
-      </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
-        <span style={{ color: 'var(--muted)' }}>Deductions</span>
-        <Money amount={c.deductions} />
-      </div>
-      <div style={{ marginTop: 10 }}>{children}</div>
     </div>
   )
 }

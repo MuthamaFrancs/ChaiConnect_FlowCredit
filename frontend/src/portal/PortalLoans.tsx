@@ -1,104 +1,81 @@
-import { useState } from 'react'
-import { useApp } from '../context/AppProvider'
+import { useEffect, useState } from 'react'
 import { MpesaBadge } from '../components/MpesaBadge'
+import { Money } from '../components/Money'
+import { useApp } from '../context/AppProvider'
 import { PortalCard, PortalPageTitle } from './PortalChrome'
+import { fetchFarmerLoans } from '../lib/api'
 
 export function PortalLoans() {
   const { t } = useApp()
-  const [step, setStep] = useState(0)
+  const farmerId = 'wanjiku'
+  const [loans, setLoans] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    void (async () => {
+      setLoading(true)
+      const data = await fetchFarmerLoans(farmerId)
+      setLoans(data)
+      setLoading(false)
+    })()
+  }, [])
 
   return (
     <div>
-      <PortalPageTitle
-        title="FlowCredit"
-        subtitle="Gold actions · score ring · B2C flow (simulated)"
-      />
-      <PortalCard accent="gold">
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '8px 0 4px' }}>
-          <svg viewBox="0 0 36 36" style={{ width: 150, height: 150 }}>
-            <path
-              d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-              fill="none"
-              stroke="rgba(0,0,0,0.08)"
-              strokeWidth="3"
-            />
-            <path
-              d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-              fill="none"
-              stroke="var(--gold)"
-              strokeWidth="3"
-              strokeDasharray={`${82}, 100`}
-              strokeLinecap="round"
-            />
-            <text x="18" y="20.35" textAnchor="middle" fontSize="9" fontWeight="900" fill="var(--text)" fontFamily="var(--font-display)">
-              82
-            </text>
-          </svg>
-        </div>
-        <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>Credit score / 100</div>
-      </PortalCard>
+      <PortalPageTitle title={t('My loans', 'Mikopo yangu')} subtitle={t('FlowCredit M-Pesa loans', 'Mikopo ya FlowCredit')} />
 
-      <PortalCard style={{ marginTop: 12 }}>
-        <div style={{ fontWeight: 900, fontFamily: 'var(--font-display)', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <MpesaBadge />
-          {t('Active loan', 'Mkopo hai')}
-        </div>
-        <div className="mono" style={{ marginTop: 10, fontSize: 15, fontWeight: 700 }}>
-          KSh 25,000 · remaining KSh 8,333
-        </div>
-        <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 8 }}>Next deduction: Tue 1 Apr 2025</div>
-      </PortalCard>
+      {loading ? (
+        <PortalCard><div style={{ textAlign: 'center', padding: 20, color: 'var(--muted)' }}>Loading loans…</div></PortalCard>
+      ) : loans.length === 0 ? (
+        <PortalCard>
+          <div style={{ textAlign: 'center', padding: 30 }}>
+            <div style={{ fontSize: 36, marginBottom: 12 }}>🌱</div>
+            <div style={{ fontWeight: 800, fontSize: 16 }}>{t('No active loans', 'Hakuna mikopo hai')}</div>
+            <div style={{ color: 'var(--muted)', marginTop: 6, fontSize: 13 }}>
+              {t('You are eligible for a FlowCredit loan. Apply below!', 'Unastahili mkopo wa FlowCredit. Omba hapa chini!')}
+            </div>
+          </div>
+        </PortalCard>
+      ) : (
+        loans.map((loan: any) => {
+          const pct = Math.round(Number(loan.repaidFraction || 0) * 100)
+          const statusColor = loan.status === 'Active' ? 'var(--fresh)' : loan.status === 'Overdue' ? '#dc2626' : loan.status === 'Completed' ? 'var(--muted)' : 'var(--gold)'
+          return (
+            <PortalCard key={loan.id} style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <div className="mono" style={{ fontWeight: 900, fontSize: 22 }}><Money amount={Number(loan.amount)} /></div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
+                    {loan.interestPct}% interest · {loan.instalments} instalments
+                  </div>
+                </div>
+                <span className="chip" style={{ background: `${statusColor}22`, color: statusColor, fontWeight: 800 }}>
+                  {loan.status}
+                </span>
+              </div>
 
-      {step === 0 && (
-        <button className="btn btn-gold" type="button" style={{ width: '100%', marginTop: 14, justifyContent: 'center' }} onClick={() => setStep(1)}>
-          <MpesaBadge /> {t('Start application', 'Anza maombi')}
-        </button>
+              <div style={{ marginTop: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--muted)' }}>
+                  <span>{t('Repaid', 'Imelipwa')}</span>
+                  <span className="mono">{pct}%</span>
+                </div>
+                <div style={{ height: 8, background: 'rgba(0,0,0,0.06)', borderRadius: 999, overflow: 'hidden', marginTop: 6 }}>
+                  <div style={{ width: `${pct}%`, height: '100%', borderRadius: 999, background: 'linear-gradient(90deg, var(--gold), var(--fresh))', transition: 'width 0.6s ease' }} />
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: 12, color: 'var(--muted)' }}>
+                <span>{t('Disbursed', 'Imetolewa')}: {loan.disbursedAt || '—'}</span>
+                {loan.nextDue && <span>{t('Next due', 'Inafika')}: {loan.nextDue}</span>}
+              </div>
+            </PortalCard>
+          )
+        })
       )}
-      {step === 1 && (
-        <PortalCard style={{ marginTop: 14 }} accent="fresh">
-          <strong style={{ fontFamily: 'var(--font-display)' }}>{t('Offer', 'Toleo')}</strong>
-          <div className="mono" style={{ fontSize: 28, fontWeight: 900, color: 'var(--gold)', marginTop: 10 }}>
-            KSh 30,000
-          </div>
-          <button className="btn btn-primary" type="button" style={{ width: '100%', marginTop: 14 }} onClick={() => setStep(2)}>
-            {t('Continue', 'Endelea')}
-          </button>
-        </PortalCard>
-      )}
-      {step === 2 && (
-        <PortalCard style={{ marginTop: 14 }}>
-          <strong style={{ fontFamily: 'var(--font-display)' }}>{t('Terms', 'Vigezo')}</strong>
-          <div style={{ fontSize: 14, color: 'var(--muted)', marginTop: 10, lineHeight: 1.5 }}>
-            8% flat · 3 payroll deductions · consent on record.
-          </div>
-          <button className="btn btn-primary" type="button" style={{ width: '100%', marginTop: 14 }} onClick={() => setStep(3)}>
-            {t('I agree', 'Ninakubali')}
-          </button>
-        </PortalCard>
-      )}
-      {step === 3 && (
-        <PortalCard style={{ marginTop: 14 }} accent="forest">
-          <strong style={{ fontFamily: 'var(--font-display)' }}>{t('Confirm', 'Thibitisha')}</strong>
-          <div style={{ fontSize: 14, color: 'var(--muted)', marginTop: 10 }}>B2C payload queued (sandbox).</div>
-          <pre
-            className="mono"
-            style={{
-              marginTop: 12,
-              padding: 12,
-              background: '#0b1220',
-              color: '#baf7cf',
-              borderRadius: 10,
-              fontSize: 11,
-              overflow: 'auto',
-            }}
-          >
-            {`{\n  "CommandID": "BusinessPayment",\n  "Amount": 30000\n}`}
-          </pre>
-          <button className="btn btn-gold" type="button" style={{ width: '100%', marginTop: 14 }} onClick={() => setStep(0)}>
-            {t('Done', 'Imekamilika')}
-          </button>
-        </PortalCard>
-      )}
+
+      <button className="btn btn-gold" style={{ width: '100%', marginTop: 14, justifyContent: 'center' }}>
+        <MpesaBadge /> {t('Apply for new loan', 'Omba mkopo mpya')}
+      </button>
     </div>
   )
 }
