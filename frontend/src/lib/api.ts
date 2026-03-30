@@ -77,26 +77,46 @@ export async function fetchChartActivity() {
   return remote?.points ?? CHART_DELIVERY_ACTIVITY
 }
 
-export async function postSimulateB2C(body: Record<string, unknown>) {
+export type B2CSimResponse = {
+  ok?: boolean
+  mode?: 'daraja' | 'simulation' | 'error'
+  steps?: { label: string; ms: number }[]
+  payload?: Record<string, unknown>
+  daraja?: Record<string, unknown>
+  error?: unknown
+}
+
+const OFFLINE_B2C_STEPS: { label: string; ms: number }[] = [
+  { label: 'Request OAuth token from Daraja', ms: 400 },
+  { label: 'POST /mpesa/b2c/v1/paymentrequest', ms: 1200 },
+  { label: 'Receive webhook callback', ms: 800 },
+  { label: 'Record disbursement + repayment schedule', ms: 400 },
+]
+
+/** FlowCredit disburse: hits backend; uses real Daraja when configured, else simulation. */
+export async function postSimulateB2C(body: Record<string, unknown>): Promise<B2CSimResponse> {
   try {
     const r = await fetch('/api/mpesa/simulate-b2c', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
-    if (!r.ok) return null
-    return (await r.json()) as {
-      steps: { label: string; ms: number }[]
-      payload: Record<string, unknown>
+    const data = (await r.json().catch(() => ({}))) as B2CSimResponse
+    if (!r.ok) {
+      return {
+        ok: false,
+        mode: 'error',
+        error: data?.error ?? data,
+        steps: OFFLINE_B2C_STEPS,
+        payload: body,
+      }
     }
+    return { ok: data.ok !== false, ...data }
   } catch {
     return {
-      steps: [
-        { label: 'Request OAuth token from Daraja', ms: 400 },
-        { label: 'POST /mpesa/b2c/v3/paymentrequest', ms: 1200 },
-        { label: 'Receive webhook callback', ms: 800 },
-        { label: 'Record disbursement + repayment schedule', ms: 400 },
-      ],
+      ok: true,
+      mode: 'simulation',
+      steps: OFFLINE_B2C_STEPS,
       payload: body,
     }
   }

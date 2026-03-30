@@ -9,7 +9,7 @@ const DEMO_FARMER = FARMERS.find((f) => f.id === 'wanjiku') ?? FARMERS[0]
 
 export function FlowCreditDisbursePage() {
   const farmer = DEMO_FARMER
-  const { queueStaffB2CForFarmer, t } = useApp()
+  const { queueStaffB2CForFarmer, t, pushToast } = useApp()
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState(0)
   const termsRef = useRef<HTMLDivElement>(null)
@@ -27,6 +27,15 @@ export function FlowCreditDisbursePage() {
     setOpen(true)
     setStep(0)
     const plan = await postSimulateB2C(payload)
+    if (plan.ok === false) {
+      const msg =
+        typeof plan.error === 'object' && plan.error && 'error' in (plan.error as object)
+          ? String((plan.error as { error?: string }).error)
+          : JSON.stringify(plan.error ?? plan)
+      pushToast(t(`Daraja: ${msg}`, `Daraja: ${msg}`))
+      setOpen(false)
+      return
+    }
     const delays = (plan?.steps ?? [
       { label: 'OAuth', ms: 400 },
       { label: 'B2C', ms: 1200 },

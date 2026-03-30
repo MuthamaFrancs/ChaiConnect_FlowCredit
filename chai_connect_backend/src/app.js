@@ -8,6 +8,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const mpesaService = require('./services/MpesaService');
 const apiRoutes = require('./routes/api');
+const mpesaRoutes = require('./routes/mpesaRoutes');
 
 const app = express();
 
@@ -32,5 +33,6 @@ app.get('/test-mpesa-token', async (req, res) => {
 });
 
 app.use('/api', apiRoutes);
+app.use('/api/mpesa', mpesaRoutes);
 
 module.exports = app;
