@@ -3,6 +3,8 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const mpesaService = require('./services/MpesaService');
+// routes
+const mpesaRoutes = require('./routes/mpesaRoutes');
 
 const app = express();
 
@@ -11,6 +13,9 @@ app.use(helmet()); // Security headers
 app.use(cors()); // Allow frontend to connect
 app.use(morgan('dev')); // Log requests
 app.use(express.json()); // Parse JSON bodies
+// Mount routes under the v1 namespace so clients calling
+// /api/v1/mpesa/disburse will reach these handlers.
+app.use('/api/v1/mpesa', mpesaRoutes);
 
 // Health check route
 app.get('/health', (req, res) => {
@@ -24,6 +29,15 @@ app.get('/test-mpesa-token', async (req, res) => {
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
+});
+
+// Optional: Fix that 404 on the home page
+app.get('/', (req, res) => {
+  res.send('☕ ChaiConnect Backend is Live!');
+});
+
+app.post('/api/v1/mpesa/disburse', (req, res) => {
+  res.json({ success: true, message: 'Mock disburse received', body: req.body });
 });
 
 module.exports = app;
