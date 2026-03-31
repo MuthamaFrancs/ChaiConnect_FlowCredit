@@ -27,6 +27,7 @@ import { PortalLoans } from './portal/PortalLoans'
 import { PortalUssd } from './portal/PortalUssd'
 import { PortalWallet } from './portal/PortalWallet'
 import { VoiceAgent } from './components/VoiceAgent'
+import ErrorBoundary from './components/ErrorBoundary'
 
 function RequireStaff({ children }: { children: React.ReactElement }) {
   const { auth } = useApp()
@@ -110,8 +111,10 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <AppProvider>
-      <AppRoutes />
-    </AppProvider>
+    <ErrorBoundary>
+      <AppProvider>
+        <AppRoutes />
+      </AppProvider>
+    </ErrorBoundary>
   )
 }
