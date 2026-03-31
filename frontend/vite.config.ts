@@ -7,7 +7,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'https://chaiconnectflowcredit-production.up.railway.app/',
+        target: 'http://localhost:5001',
         changeOrigin: true,
       },
     },

@@ -1,3 +1,5 @@
+const BASE_URL = import.meta.env.VITE_API_URL;
+
 import {
   CHART_DELIVERY_ACTIVITY, COMPLAINTS, DELIVERIES,
   FARMERS, LOANS, MPESA_FEED, RECENT_PAYMENTS,
@@ -38,7 +40,7 @@ export async function registerFarmer(data: {
   factory?: string; zone?: string; cooperative?: string;
 }) {
   try {
-    const r = await fetch('/api/farmers', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+    const r = await fetch(`${BASE_URL}/api/farmers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
     if (!r.ok) return null; return (await r.json()) as { farmer: (typeof FARMERS)[0] }
   } catch { return null }
 }

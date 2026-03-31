@@ -17,10 +17,7 @@ const app = express();
 app.use(helmet()); // Security headers
 app.use(cors(
   {
-  origin: [
-    "http://localhost:5173", // local dev
-    "https://your-vercel-app.vercel.app" // production frontend
-  ],
+  origin: true,
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
 }
