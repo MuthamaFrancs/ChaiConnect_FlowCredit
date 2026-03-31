@@ -32,8 +32,8 @@ class MpesaService {
       PartyA: shortcode,
       PartyB: phone,
       Remarks: remarks,
-  QueueTimeOutURL: `${baseUrl}/api/v1/mpesa/b2c/timeout`,
-  ResultURL: `${baseUrl}/api/v1/mpesa/b2c/result`,
+  QueueTimeOutURL: `${baseUrl}/api/mpesa/b2c/timeout`,
+  ResultURL: `${baseUrl}/api/mpesa/b2c/result`,
       Occasion: occasion,
     };
 
@@ -66,8 +66,8 @@ class MpesaService {
     const body = {
       ShortCode: shortcode,
       ResponseType: 'Completed',
-  ConfirmationURL: `${baseUrl}/api/v1/mpesa/c2b/confirmation`,
-  ValidationURL: `${baseUrl}/api/v1/mpesa/c2b/validation`,
+  ConfirmationURL: `${baseUrl}/api/mpesa/c2b/confirmation`,
+  ValidationURL: `${baseUrl}/api/mpesa/c2b/validation`,
     };
 
     try {
@@ -97,8 +97,8 @@ class MpesaService {
       TransactionID: transactionID,
       PartyA: shortcode,
       IdentifierType: '4',
-  ResultURL: `${baseUrl}/api/v1/mpesa/txstatus/result`,
-  QueueTimeOutURL: `${baseUrl}/api/v1/mpesa/txstatus/timeout`,
+  ResultURL: `${baseUrl}/api/mpesa/txstatus/result`,
+  QueueTimeOutURL: `${baseUrl}/api/mpesa/txstatus/timeout`,
       Remarks: 'ChaiConnect status check',
       Occasion: 'Status',
     };
@@ -135,8 +135,8 @@ class MpesaService {
     "PartyA": process.env.MPESA_SHORTCODE, // Your B2C shortcode
     "PartyB": phoneNumber, 
     "Remarks": `FlowCredit Loan Disbursement: ${loanId}`,
-    "QueueTimeOutURL": `${process.env.BASE_URL}/api/v1/mpesa/b2c/timeout`,
-    "ResultURL": `${process.env.BASE_URL}/api/v1/mpesa/b2c/result`,
+    "QueueTimeOutURL": `${process.env.BASE_URL}/api/mpesa/b2c/timeout`,
+    "ResultURL": `${process.env.BASE_URL}/api/mpesa/b2c/result`,
     "Occasion": "AgriTechLoan"
   };
 

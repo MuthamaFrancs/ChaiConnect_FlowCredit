@@ -227,8 +227,8 @@ export function FlowCreditDisbursePage() {
               PartyA: '600984',
               PartyB: phone254,
               Remarks: `FlowCredit loan — ${farmer.name}`,
-              ResultURL: `${window.location.origin}/api/v1/mpesa/b2c/result`,
-              QueueTimeOutURL: `${window.location.origin}/api/v1/mpesa/b2c/timeout`,
+              ResultURL: `${window.location.origin}/api/mpesa/b2c/result`,
+              QueueTimeOutURL: `${window.location.origin}/api/mpesa/b2c/timeout`,
               Occasion: 'Loan',
             }, null, 2)}
           </pre>

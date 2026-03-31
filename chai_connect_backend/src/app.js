@@ -15,12 +15,21 @@ const app = express();
 
 // Middleware
 app.use(helmet()); // Security headers
-app.use(cors()); // Allow frontend to connect
+app.use(cors(
+  {
+  origin: [
+    "http://localhost:5173", // local dev
+    "https://your-vercel-app.vercel.app" // production frontend
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
+}
+)); // Allow frontend to connect
 app.use(morgan('dev')); // Log requests
 app.use(express.json()); // Parse JSON bodies
 // Mount routes under the v1 namespace so clients calling
-// /api/v1/mpesa/disburse will reach these handlers.
-app.use('/api/v1/mpesa', mpesaRoutes);
+// /api/mpesa/disburse will reach these handlers.
+app.use('/api/mpesa', mpesaRoutes);
 
 // Health check route
 app.get('/health', (req, res) => {

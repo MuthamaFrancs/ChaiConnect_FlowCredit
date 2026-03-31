@@ -80,7 +80,7 @@ export async function fetchFarmerPayments(farmerId: string) {
 }
 
 export async function fetchMpesaFeed() {
-  const remote = await api<{ transactions: typeof MPESA_FEED }>('/api/v1/mpesa/transactions')
+  const remote = await api<{ transactions: typeof MPESA_FEED }>('/api/mpesa/transactions')
   return remote?.transactions ?? MPESA_FEED
 }
 
@@ -133,7 +133,7 @@ export async function postDisburse(body: {
   phone: string; amount: number; farmerId?: string; farmerName?: string; remarks?: string;
 }) {
   try {
-  const r = await fetch(buildUrl('/api/v1/mpesa/disburse'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  const r = await fetch(buildUrl('/api/mpesa/disburse'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     if (!r.ok) return null
     return (await r.json()) as { ok: boolean; ref: string; simulated: boolean; message: string; steps: { label: string; ms: number }[]; payload: Record<string, unknown> }
   } catch { return null }
@@ -142,7 +142,7 @@ export async function postDisburse(body: {
 // ── Bulk Disburse All ────────────────────────────────────
 export async function postDisburseAll(farmerIds?: string[]) {
   try {
-  const r = await fetch(buildUrl('/api/v1/mpesa/disburse-all'), {
+  const r = await fetch(buildUrl('/api/mpesa/disburse-all'), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ farmerIds }),
     })
@@ -165,7 +165,7 @@ export async function batchApprovePayments(paymentIds: string[], action: 'approv
 // ── C2B Simulation (repayment intercept demo) ───────────
 export async function simulateC2B(body: { phone: string; amount: number; reference?: string }) {
   try {
-  const r = await fetch(buildUrl('/api/v1/mpesa/simulate-c2b'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  const r = await fetch(buildUrl('/api/mpesa/simulate-c2b'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     if (!r.ok) return null
     return (await r.json()) as { ok: boolean; transId: string; farmer: string; gross: number; loanDeduction: number; net: number; loanIntercepted: boolean; message: string }
   } catch { return null }
@@ -174,7 +174,7 @@ export async function simulateC2B(body: { phone: string; amount: number; referen
 // ── Transaction Status ──────────────────────────────────
 export async function checkTransactionStatus(transactionId: string) {
   try {
-  const r = await fetch(buildUrl('/api/v1/mpesa/transaction-status'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ transactionId }) })
+  const r = await fetch(buildUrl('/api/mpesa/transaction-status'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ transactionId }) })
     if (!r.ok) return null; return (await r.json()) as { result: any; transactionId: string }
   } catch { return null }
 }
@@ -187,7 +187,7 @@ export async function fetchSmsLog() {
 
 export async function postSimulateB2C(body: Record<string, unknown>) {
   try {
-  const r = await fetch(buildUrl('/api/v1/mpesa/simulate-b2c'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  const r = await fetch(buildUrl('/api/mpesa/simulate-b2c'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     if (!r.ok) return null; return (await r.json()) as { steps: { label: string; ms: number }[]; payload: Record<string, unknown> }
   } catch { return { steps: [{ label: 'OAuth', ms: 400 }, { label: 'B2C', ms: 1200 }, { label: 'Webhook', ms: 800 }, { label: 'Ledger', ms: 400 }], payload: body } }
 }
