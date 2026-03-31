@@ -150,3 +150,21 @@ exports.disburseLoanMock = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// List recent MPESA transactions (fallback to seeded data when DB not available)
+exports.listTransactions = async (req, res) => {
+  try {
+    const models = require('../models');
+    const MpesaFeed = models.MpesaFeed;
+    const transactions = await MpesaFeed.findAll({ raw: true, order: [['createdAt','DESC']], limit: 50 });
+    return res.json({ transactions });
+  } catch (err) {
+    // Fallback to seeded mock data
+    try {
+      const { MPESA_FEED } = require('../data/seedPayload');
+      return res.json({ transactions: MPESA_FEED });
+    } catch (e) {
+      return res.json({ transactions: [] });
+    }
+  }
+};

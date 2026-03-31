@@ -12,4 +12,7 @@ router.post('/b2c/result', mpesaController.handleB2CResult);
 router.post('/b2c/timeout', mpesaController.handleB2CTimeout);
 router.post('/pay-farmer', mpesaController.payFarmerForProduce);
 
+// Expose recent MPESA transactions (similar to legacy /api/mpesa/transactions)
+router.get('/transactions', mpesaController.listTransactions);
+
 module.exports = router;
