@@ -744,4 +744,103 @@ router.post('/mpesa/simulate-b2c', express.json(), (req, res) => {
   });
 });
 
+// ═══════════════════════════════════════════════════════════
+//  SEED PREMIUM HISTORY (demo helper — boosts a farmer to Grade A)
+// ═══════════════════════════════════════════════════════════
+router.post('/seed-premium-history/:farmerId', async (req, res) => {
+  try {
+    if (!Farmer) return res.status(500).json({ error: 'DB unavailable' });
+
+    const farmer = await Farmer.findByPk(req.params.farmerId);
+    if (!farmer) return res.status(404).json({ error: 'Farmer not found' });
+
+    const fid = farmer.id;
+    const fname = farmer.name;
+
+    function daysAgo(n) {
+      const d = new Date(); d.setDate(d.getDate() - n);
+      return d.toISOString().slice(0, 10);
+    }
+
+    // Update farmer base stats
+    await farmer.update({
+      activeSince: '2019-01-15',
+      totalKg: 22000,
+      totalEarned: 660000,
+      creditScore: 95,
+      creditTier: 'A',
+      loanFlow: 'eligible',
+      gradeTrend: 'A',
+    });
+
+    // Create 36 months of deliveries (2 per month = 72 total)
+    const deliveries = [];
+    for (let m = 0; m < 36; m++) {
+      for (let d = 0; d < 2; d++) {
+        const kg = 280 + Math.round(Math.random() * 120);
+        const grade = Math.random() > 0.15 ? 'A' : 'B';
+        const rate = grade === 'A' ? 30 : 25;
+        const gross = kg * rate;
+        const deductions = Math.round(gross * 0.1);
+        deliveries.push({
+          id: `${fid}-pd${m}-${d}`,
+          farmerId: fid,
+          date: daysAgo(m * 30 + d * 14),
+          kg, grade, rate, gross, deductions,
+          net: gross - deductions,
+          status: 'Paid',
+        });
+      }
+    }
+    await Delivery.bulkCreate(deliveries, { ignoreDuplicates: true });
+
+    // Create 3 completed loans (perfect history)
+    const loans = [
+      { id: `${fid}-pL1`, farmerId: fid, farmerName: fname, amount: 30000, interestPct: 8, status: 'Completed', disbursedAt: '2023-03-01', repaidFraction: 1, instalments: 3 },
+      { id: `${fid}-pL2`, farmerId: fid, farmerName: fname, amount: 40000, interestPct: 8, status: 'Completed', disbursedAt: '2024-01-15', repaidFraction: 1, instalments: 3 },
+      { id: `${fid}-pL3`, farmerId: fid, farmerName: fname, amount: 45000, interestPct: 6, status: 'Completed', disbursedAt: '2024-09-01', repaidFraction: 1, instalments: 3 },
+    ];
+    await Loan.bulkCreate(loans, { ignoreDuplicates: true });
+
+    // Create 40 payment records
+    const payments = [];
+    for (let i = 0; i < 40; i++) {
+      const amount = 8000 + Math.round(Math.random() * 4000);
+      const ded = Math.round(Math.random() * 2000);
+      payments.push({
+        id: `${fid}-pP${i}`,
+        farmerId: fid, farmer: fname, phone: farmer.phone,
+        amount, deductions: ded, net: amount - ded,
+        status: 'Paid',
+        time: `${daysAgo(i * 7)} 10:${String(i % 60).padStart(2, '0')}`,
+        mpesaRef: `MPR${String(100 + i)}`,
+      });
+    }
+    await Payment.bulkCreate(payments, { ignoreDuplicates: true });
+
+    // Recalculate score
+    const allDeliveries = await Delivery.findAll({ where: { farmerId: fid }, raw: true });
+    const allLoans = await Loan.findAll({ where: { farmerId: fid }, raw: true });
+    const allPayments = await Payment.findAll({ where: { farmerId: fid }, raw: true });
+    const updatedFarmer = await Farmer.findByPk(fid, { raw: true });
+    const result = creditScoringService.calculate({
+      farmer: updatedFarmer, deliveries: allDeliveries, loans: allLoans, payments: allPayments,
+    });
+    await Farmer.update({ creditScore: result.score, creditTier: result.grade }, { where: { id: fid } });
+
+    res.json({
+      ok: true,
+      farmer: fname,
+      score: result.score,
+      grade: result.grade,
+      maxLoan: creditScoringService.maxLoanAmount(result.grade),
+      seeded: { deliveries: deliveries.length, loans: loans.length, payments: payments.length },
+      factors: result.factors,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
+
