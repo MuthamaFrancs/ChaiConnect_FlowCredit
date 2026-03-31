@@ -21,23 +21,13 @@ function buildUrl(path: string) {
 
 const api = async <T>(path: string): Promise<T | null> => {
   try {
-<<<<<<< HEAD
-    const r = await fetch(buildUrl(path))
-    if (!r.ok) return null
-    return (await r.json()) as T
-  } catch {
-    return null
-  }
-}
-=======
-    const r = await fetch(path);
+    const r = await fetch(buildUrl(path));
     if (!r.ok) return null;
     return (await r.json()) as T;
   } catch {
     return null;
   }
 };
->>>>>>> 85e01c9 (feat: add backend environment validation, graceful shutdown, and frontend error boundary support)
 
 export async function fetchFarmers() {
   const remote = await api<{ farmers: typeof FARMERS }>("/api/farmers");
@@ -61,12 +51,7 @@ export async function registerFarmer(data: {
   cooperative?: string;
 }) {
   try {
-<<<<<<< HEAD
-    const r = await fetch(`${BASE_URL}/api/farmers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
-    if (!r.ok) return null; return (await r.json()) as { farmer: (typeof FARMERS)[0] }
-  } catch { return null }
-=======
-    const r = await fetch("/api/farmers", {
+    const r = await fetch(buildUrl("/api/farmers"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
@@ -76,7 +61,6 @@ export async function registerFarmer(data: {
   } catch {
     return null;
   }
->>>>>>> 85e01c9 (feat: add backend environment validation, graceful shutdown, and frontend error boundary support)
 }
 
 export async function fetchStats() {
@@ -240,13 +224,7 @@ export async function postDisburse(body: {
   remarks?: string;
 }) {
   try {
-<<<<<<< HEAD
-  const r = await fetch(buildUrl('/api/mpesa/disburse'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-    if (!r.ok) return null
-    return (await r.json()) as { ok: boolean; ref: string; simulated: boolean; message: string; steps: { label: string; ms: number }[]; payload: Record<string, unknown> }
-  } catch { return null }
-=======
-    const r = await fetch("/api/mpesa/disburse", {
+    const r = await fetch(buildUrl("/api/mpesa/disburse"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -263,20 +241,14 @@ export async function postDisburse(body: {
   } catch {
     return null;
   }
->>>>>>> 85e01c9 (feat: add backend environment validation, graceful shutdown, and frontend error boundary support)
 }
 
 // ── Bulk Disburse All ────────────────────────────────────
 export async function postDisburseAll(farmerIds?: string[]) {
   try {
-<<<<<<< HEAD
-  const r = await fetch(buildUrl('/api/mpesa/disburse-all'), {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-=======
-    const r = await fetch("/api/mpesa/disburse-all", {
+    const r = await fetch(buildUrl("/api/mpesa/disburse-all"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
->>>>>>> 85e01c9 (feat: add backend environment validation, graceful shutdown, and frontend error boundary support)
       body: JSON.stringify({ farmerIds }),
     });
     if (!r.ok) return null;
@@ -315,13 +287,7 @@ export async function simulateC2B(body: {
   reference?: string;
 }) {
   try {
-<<<<<<< HEAD
-  const r = await fetch(buildUrl('/api/mpesa/simulate-c2b'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-    if (!r.ok) return null
-    return (await r.json()) as { ok: boolean; transId: string; farmer: string; gross: number; loanDeduction: number; net: number; loanIntercepted: boolean; message: string }
-  } catch { return null }
-=======
-    const r = await fetch("/api/mpesa/simulate-c2b", {
+    const r = await fetch(buildUrl("/api/mpesa/simulate-c2b"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -340,18 +306,12 @@ export async function simulateC2B(body: {
   } catch {
     return null;
   }
->>>>>>> 85e01c9 (feat: add backend environment validation, graceful shutdown, and frontend error boundary support)
 }
 
 // ── Transaction Status ──────────────────────────────────
 export async function checkTransactionStatus(transactionId: string) {
   try {
-<<<<<<< HEAD
-  const r = await fetch(buildUrl('/api/mpesa/transaction-status'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ transactionId }) })
-    if (!r.ok) return null; return (await r.json()) as { result: any; transactionId: string }
-  } catch { return null }
-=======
-    const r = await fetch("/api/mpesa/transaction-status", {
+    const r = await fetch(buildUrl("/api/mpesa/transaction-status"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ transactionId }),
@@ -361,7 +321,6 @@ export async function checkTransactionStatus(transactionId: string) {
   } catch {
     return null;
   }
->>>>>>> 85e01c9 (feat: add backend environment validation, graceful shutdown, and frontend error boundary support)
 }
 
 // ── SMS Log ──────────────────────────────────────────────
@@ -380,12 +339,7 @@ export async function fetchSmsLog() {
 
 export async function postSimulateB2C(body: Record<string, unknown>) {
   try {
-<<<<<<< HEAD
-  const r = await fetch(buildUrl('/api/mpesa/simulate-b2c'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-    if (!r.ok) return null; return (await r.json()) as { steps: { label: string; ms: number }[]; payload: Record<string, unknown> }
-  } catch { return { steps: [{ label: 'OAuth', ms: 400 }, { label: 'B2C', ms: 1200 }, { label: 'Webhook', ms: 800 }, { label: 'Ledger', ms: 400 }], payload: body } }
-=======
-    const r = await fetch("/api/mpesa/simulate-b2c", {
+    const r = await fetch(buildUrl("/api/mpesa/simulate-b2c"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
@@ -406,5 +360,4 @@ export async function postSimulateB2C(body: Record<string, unknown>) {
       payload: body,
     };
   }
->>>>>>> 85e01c9 (feat: add backend environment validation, graceful shutdown, and frontend error boundary support)
 }

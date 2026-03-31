@@ -14,25 +14,8 @@ const apiRoutes = require('./routes/api');
 
 const app = express();
 
-<<<<<<< HEAD
-// Middleware
-app.use(helmet()); // Security headers
-app.use(cors(
-  {
-  origin: true,
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  credentials: true
-}
-)); // Allow frontend to connect
-app.use(morgan('dev')); // Log requests
-app.use(express.json()); // Parse JSON bodies
-// Mount routes under the v1 namespace so clients calling
-// /api/mpesa/disburse will reach these handlers.
-app.use('/api/mpesa', mpesaRoutes);
-=======
 // ── Security Headers
 app.use(helmet()); 
->>>>>>> 85e01c9 (feat: add backend environment validation, graceful shutdown, and frontend error boundary support)
 
 // ── Environment-Aware CORS
 // Defaults to open for hackathon/local testing, but locks down if FRONTEND_URL is set
