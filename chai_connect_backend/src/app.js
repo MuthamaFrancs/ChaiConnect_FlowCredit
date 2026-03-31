@@ -1,10 +1,15 @@
+/**
+ * ChaiConnect Express application entry (middleware + routes).
+ * Demo JSON APIs are mounted at /api; production can add auth and real Daraja webhooks here.
+ */
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const mpesaService = require('./services/MpesaService');
-// routes
+// route modules
 const mpesaRoutes = require('./routes/mpesaRoutes');
+const apiRoutes = require('./routes/api');
 
 const app = express();
 
@@ -31,13 +36,6 @@ app.get('/test-mpesa-token', async (req, res) => {
   }
 });
 
-// Optional: Fix that 404 on the home page
-app.get('/', (req, res) => {
-  res.send('☕ ChaiConnect Backend is Live!');
-});
-
-app.post('/api/v1/mpesa/disburse', (req, res) => {
-  res.json({ success: true, message: 'Mock disburse received', body: req.body });
-});
+app.use('/api', apiRoutes);
 
 module.exports = app;

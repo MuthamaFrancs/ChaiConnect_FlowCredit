@@ -1,29 +1,34 @@
-const app = require('./src/app.js');
 require('dotenv').config();
-// This index file should contain both the 'sequelize' instance and your Models.
-const { sequelize } = require('./src/models'); 
+const app = require('./src/app.js');
+const { sequelize } = require('./src/models');
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 async function startServer() {
   try {
-    // 2. Sync models (creates tables)
-    // Using { alter: true } is great for development/
-    await sequelize.sync({ alter: true }); 
-    console.log('✅ Database models synced.');
-
-    // 3. Test Connection
     await sequelize.authenticate();
-    console.log('✅ Database connection established successfully.');
+    console.log('✅ Connected to Neon DB successfully.');
 
-    // 4. Start Express
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running on http://localhost:${PORT}`);
-    });
+    // sync() creates tables if they don't exist, leaves existing data untouched
+    await sequelize.sync();
+    console.log('✅ Database tables ready.');
   } catch (error) {
-    console.error('❌ Unable to connect to the database:', error);
-    process.exit(1); 
+    // Don't crash — the API routes fall back to mock data automatically
+    console.warn('⚠️  DB sync issue (running in mock-data mode):', error.message);
   }
+
+  const server = app.listen(PORT, () => {
+    console.log(`🚀 ChaiConnect backend running on http://localhost:${PORT}`);
+  });
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.error(`❌ Port ${PORT} is already in use. Run: lsof -ti:${PORT} | xargs kill -9`);
+    } else {
+      console.error('❌ Server error:', err.message);
+    }
+    process.exit(1);
+  });
 }
 
 startServer();

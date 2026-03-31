@@ -112,3 +112,41 @@ exports.payFarmerForProduce = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// Mock disbursement handler for local testing without Daraja
+exports.disburseLoanMock = async (req, res) => {
+  const { farmerId, amount } = req.body;
+  try {
+    const farmer = await Farmer.findOne({ where: { farmerId } });
+    if (!farmer) return res.status(404).json({ message: 'Farmer not found' });
+
+    const totalRepayable = parseFloat(amount) * 1.08;
+    const loan = await Loan.create({
+      FarmerId: farmer.id,
+      loanAmount: amount,
+      totalRepayable,
+      remainingBalance: totalRepayable,
+      status: 'Active'
+    });
+
+    // Record a simulated payment to represent money moved
+    const payment = await Payment.create({
+      FarmerId: farmer.id,
+      LoanId: loan.id,
+      amount,
+      transactionId: `SIM-${Date.now()}`,
+      status: 'Completed',
+      paymentType: 'Loan_Disbursement'
+    });
+
+    // Optionally update loan as disbursed (we keep status Active)
+
+    res.status(200).json({
+      message: 'Mock disbursement completed',
+      loanId: loan.id,
+      payment
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
