@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { MpesaBadge } from '../components/MpesaBadge'
 import { fetchFarmers, registerFarmer } from '../lib/api'
-import { FARMERS, RATES } from '../data/seed'
+import { FARMERS } from '../data/seed'
 import { useApp } from '../context/AppProvider'
 
 export function FarmersPage() {

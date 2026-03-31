@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { MpesaBadge } from '../../components/MpesaBadge'
-import { Money } from '../../components/Money'
 import { postDisburse, fetchFarmers, fetchCreditScore } from '../../lib/api'
 import { useApp } from '../../context/AppProvider'
 
@@ -59,8 +58,6 @@ export function FlowCreditDisbursePage() {
     ])
 
     const phone = `254${farmer.phone.replace(/\D/g, '').slice(-9)}`
-    const startTime = Date.now()
-
     const result = await postDisburse({
       phone,
       amount,
@@ -230,8 +227,8 @@ export function FlowCreditDisbursePage() {
               PartyA: '600984',
               PartyB: phone254,
               Remarks: `FlowCredit loan — ${farmer.name}`,
-              ResultURL: `${window.location.origin}/api/mpesa/b2c/result`,
-              QueueTimeOutURL: `${window.location.origin}/api/mpesa/b2c/timeout`,
+              ResultURL: `${window.location.origin}/api/v1/mpesa/b2c/result`,
+              QueueTimeOutURL: `${window.location.origin}/api/v1/mpesa/b2c/timeout`,
               Occasion: 'Loan',
             }, null, 2)}
           </pre>
