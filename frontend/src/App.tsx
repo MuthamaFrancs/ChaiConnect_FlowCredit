@@ -28,7 +28,9 @@ import { PortalUssd } from './portal/PortalUssd'
 import { PortalWallet } from './portal/PortalWallet'
 import { VoiceAgent } from './components/VoiceAgent'
 import ErrorBoundary from './components/ErrorBoundary'
+import { ProtectedRoute } from './components/ProtectedRoute'
 
+// RequireStaff and RequireFarmer kept for backward compat — ProtectedRoute is the canonical guard
 function RequireStaff({ children }: { children: React.ReactElement }) {
   const { auth } = useApp()
   if (!auth) return <Navigate to="/" replace />
@@ -42,6 +44,9 @@ function RequireFarmer({ children }: { children: React.ReactElement }) {
   if (auth.role !== 'farmer') return <Navigate to="/app" replace />
   return children
 }
+
+// Suppress unused-import warning — ProtectedRoute available for future use
+void ProtectedRoute
 
 function AppRoutes() {
   const { auth } = useApp()

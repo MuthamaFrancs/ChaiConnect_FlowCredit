@@ -11,8 +11,9 @@ const Loan      = require('./Loan');
 const Payment   = require('./Payment');
 const MpesaFeed = require('./MpesaFeed');
 const Complaint = require('./Complaint');
+const User      = require('./User');
 
 // No Sequelize associations — farmerId is a plain string reference.
 // This keeps sync() clean and avoids FK type conflicts.
 
-module.exports = { sequelize, Farmer, Delivery, Loan, Payment, MpesaFeed, Complaint };
+module.exports = { sequelize, Farmer, Delivery, Loan, Payment, MpesaFeed, Complaint, User };

@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import type { CreditLedgerLine, PendingFarmerDisbursement, Role } from '../types'
+import { authLogin, authMe, clearToken, setToken, type AuthUser as ApiAuthUser } from '../lib/api'
 
 export type Lang = 'en' | 'sw'
 export type ThemeMode = 'light' | 'dark'
@@ -16,6 +17,7 @@ export interface AuthUser {
   role: Role
   name: string
   factoryId: string
+  userId?: string
 }
 
 export interface ToastMessage {
@@ -102,7 +104,8 @@ interface AppCtx {
   setTheme: (t: ThemeMode) => void
   toggleTheme: () => void
   auth: AuthUser | null
-  login: (u: AuthUser) => void
+  /** login() now calls the backend and stores JWT */
+  login: (payload: { role: Role; loginId: string; password?: string; otp?: string }) => Promise<{ ok: boolean; error?: string }>
   logout: () => void
   searchOpen: boolean
   setSearchOpen: (v: boolean) => void
@@ -147,14 +150,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setTheme((t) => (t === 'light' ? 'dark' : 'light'))
   }, [])
 
-  const [auth, setAuth] = useState<AuthUser | null>(() => {
-    try {
-      const raw = localStorage.getItem('chaiconnect_auth')
-      return raw ? (JSON.parse(raw) as AuthUser) : null
-    } catch {
-      return null
-    }
-  })
+  // ── Auth: restore session from stored token on mount
+  const [auth, setAuth] = useState<AuthUser | null>(null)
+  const [authLoading, setAuthLoading] = useState(true)
+
+  useEffect(() => {
+    authMe().then((user) => {
+      if (user) {
+        setAuth({ role: user.role as Role, name: user.name, factoryId: user.factoryId, userId: user.userId })
+      } else {
+        // Try legacy localStorage fallback
+        try {
+          const raw = localStorage.getItem('chaiconnect_auth')
+          if (raw) setAuth(JSON.parse(raw) as AuthUser)
+        } catch { /* ignore */ }
+      }
+      setAuthLoading(false)
+    })
+  }, [])
   const [searchOpen, setSearchOpen] = useState(false)
   const [toasts, setToasts] = useState<ToastMessage[]>([])
 
@@ -168,10 +181,60 @@ export function AppProvider({ children }: { children: ReactNode }) {
     () => loadPlatform().farmerCreditScore,
   )
 
-  useEffect(() => {
-    if (auth) localStorage.setItem('chaiconnect_auth', JSON.stringify(auth))
-    else localStorage.removeItem('chaiconnect_auth')
-  }, [auth])
+  const login = useCallback(async (
+    payload: { role: Role; loginId: string; password?: string; otp?: string }
+  ): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      const { token, user } = await authLogin(payload)
+      setToken(token)
+      const authUser: AuthUser = {
+        role: user.role as Role,
+        name: user.name,
+        factoryId: user.factoryId,
+        userId: user.userId,
+      }
+      setAuth(authUser)
+      // Keep legacy key for backward compat with other components that read it
+      localStorage.setItem('chaiconnect_auth', JSON.stringify(authUser))
+      return { ok: true }
+    } catch (err: unknown) {
+      // Backend unreachable — fall back to demo mode
+      const errMsg = err instanceof Error ? err.message : 'Login failed'
+      console.warn('Backend login failed, using demo fallback:', errMsg)
+
+      const DEMO: Record<string, AuthUser> = {
+        'admin@chaiconnect.co.ke': { role: 'admin',   name: 'Makena Wanjiru',   factoryId: 'kiambu' },
+        'KC-2044':                 { role: 'clerk',   name: 'Juma Otieno',      factoryId: 'kiambu' },
+        'EXT-889':                 { role: 'officer', name: 'Wambui Extension', factoryId: 'kiambu' },
+        '0712345678':              { role: 'farmer',  name: 'Wanjiku Kamau',    factoryId: 'kiambu' },
+      }
+      const demo = DEMO[payload.loginId]
+      if (demo && demo.role === payload.role) {
+        // Check demo password
+        const DEMO_PWD: Record<string, string> = {
+          'admin@chaiconnect.co.ke': 'Admin@1234',
+          'KC-2044': '2044',
+          'EXT-889': 'Officer@1234',
+          '0712345678': '5921',  // OTP
+        }
+        const expectedPwd = DEMO_PWD[payload.loginId]
+        const provided = payload.password || payload.otp || ''
+        if (provided !== expectedPwd) {
+          return { ok: false, error: 'Invalid credentials' }
+        }
+        setAuth(demo)
+        localStorage.setItem('chaiconnect_auth', JSON.stringify(demo))
+        return { ok: true }
+      }
+      return { ok: false, error: errMsg }
+    }
+  }, [])
+
+  const logout = useCallback(() => {
+    clearToken()
+    localStorage.removeItem('chaiconnect_auth')
+    setAuth(null)
+  }, [])
 
   useEffect(() => {
     try {

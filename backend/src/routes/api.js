@@ -2,6 +2,7 @@ const express = require('express');
 const mpesaService = require('../services/MpesaService');
 const creditScoringService = require('../services/CreditScoringService');
 const smsService = require('../services/SmsService');
+const { requireAuth } = require('../middleware/auth');
 const {
   FARMERS, RECENT_PAYMENTS, CHART_DELIVERY_ACTIVITY,
   DELIVERIES, LOANS, MPESA_FEED, COMPLAINTS,
@@ -22,14 +23,14 @@ async function dbOrMock(dbFn, fallback) {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  FARMERS
+//  FARMERS  (protected — any authenticated user)
 // ═══════════════════════════════════════════════════════════
-router.get('/farmers', async (_req, res) => {
+router.get('/farmers', requireAuth, async (_req, res) => {
   const farmers = await dbOrMock(() => Farmer.findAll({ raw: true }), FARMERS);
   res.json({ farmers });
 });
 
-router.get('/farmers/:id', async (req, res) => {
+router.get('/farmers/:id', requireAuth, async (req, res) => {
   const farmer = await dbOrMock(
     () => Farmer.findOne({ where: { id: req.params.id }, raw: true }),
     FARMERS.find(f => f.id === req.params.id) ?? null,
@@ -38,7 +39,7 @@ router.get('/farmers/:id', async (req, res) => {
   return res.json({ farmer });
 });
 
-router.post('/farmers', async (req, res) => {
+router.post('/farmers', requireAuth, async (req, res) => {
   const { name, phone, nationalId, factory, zone, cooperative } = req.body;
   if (!name || !phone) return res.status(400).json({ error: 'name and phone required' });
   const id = name.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now().toString(36);
@@ -54,7 +55,7 @@ router.post('/farmers', async (req, res) => {
 });
 
 // ── Farmer-specific data ───────────────────────────────
-router.get('/farmers/:id/deliveries', async (req, res) => {
+router.get('/farmers/:id/deliveries', requireAuth, async (req, res) => {
   const deliveries = await dbOrMock(
     () => Delivery.findAll({ where: { farmerId: req.params.id }, raw: true, order: [['date','DESC']] }),
     DELIVERIES.filter(d => d.farmerId === req.params.id),
@@ -62,7 +63,7 @@ router.get('/farmers/:id/deliveries', async (req, res) => {
   res.json({ deliveries });
 });
 
-router.get('/farmers/:id/loans', async (req, res) => {
+router.get('/farmers/:id/loans', requireAuth, async (req, res) => {
   const loans = await dbOrMock(
     () => Loan.findAll({ where: { farmerId: req.params.id }, raw: true }),
     LOANS.filter(l => l.farmerId === req.params.id),
@@ -70,7 +71,7 @@ router.get('/farmers/:id/loans', async (req, res) => {
   res.json({ loans });
 });
 
-router.get('/farmers/:id/payments', async (req, res) => {
+router.get('/farmers/:id/payments', requireAuth, async (req, res) => {
   const payments = await dbOrMock(
     () => Payment.findAll({ where: { farmerId: req.params.id }, raw: true, order: [['createdAt','DESC']] }),
     RECENT_PAYMENTS.filter(p => p.farmerId === req.params.id),
@@ -81,7 +82,7 @@ router.get('/farmers/:id/payments', async (req, res) => {
 // ═══════════════════════════════════════════════════════════
 //  CREDIT SCORING — Real 5-factor algorithm
 // ═══════════════════════════════════════════════════════════
-router.get('/farmers/:id/credit-score', async (req, res) => {
+router.get('/farmers/:id/credit-score', requireAuth, async (req, res) => {
   const farmerId = req.params.id;
   const farmer = await dbOrMock(
     () => Farmer.findOne({ where: { id: farmerId }, raw: true }),
@@ -267,7 +268,7 @@ router.get('/sms/log', (_req, res) => {
 // ═══════════════════════════════════════════════════════════
 //  M-PESA: REAL B2C DISBURSE (single)
 // ═══════════════════════════════════════════════════════════
-router.post('/mpesa/disburse', async (req, res) => {
+router.post('/mpesa/disburse', requireAuth, async (req, res) => {
   const { phone, amount, farmerId, farmerName, remarks } = req.body;
   if (!phone || !amount) return res.status(400).json({ error: 'phone and amount required' });
 
@@ -314,7 +315,7 @@ router.post('/mpesa/disburse', async (req, res) => {
 // ═══════════════════════════════════════════════════════════
 //  M-PESA: BULK DISBURSE ALL (cooperative batch payment)
 // ═══════════════════════════════════════════════════════════
-router.post('/mpesa/disburse-all', async (req, res) => {
+router.post('/mpesa/disburse-all', requireAuth, async (req, res) => {
   const { farmerIds } = req.body; // optional — if empty, disburse to all pending
   let farmers;
 

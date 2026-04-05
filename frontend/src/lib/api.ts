@@ -19,15 +19,83 @@ function buildUrl(path: string) {
   return `${base}${path.startsWith('/') ? path : '/' + path}`
 }
 
+// ── Token helpers ─────────────────────────────────────────
+const TOKEN_KEY = 'chaiconnect_token'
+export const getToken = (): string | null => localStorage.getItem(TOKEN_KEY)
+export const setToken = (t: string) => localStorage.setItem(TOKEN_KEY, t)
+export const clearToken = () => localStorage.removeItem(TOKEN_KEY)
+
+function authHeaders(): Record<string, string> {
+  const token = getToken()
+  return token
+    ? { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
+    : { 'Content-Type': 'application/json' }
+}
+
+// Generic authenticated GET
 const api = async <T>(path: string): Promise<T | null> => {
   try {
-    const r = await fetch(buildUrl(path));
+    const r = await fetch(buildUrl(path), { headers: authHeaders() });
     if (!r.ok) return null;
     return (await r.json()) as T;
   } catch {
     return null;
   }
 };
+
+// ── Auth API ──────────────────────────────────────────────
+export interface AuthUser {
+  role: 'admin' | 'clerk' | 'officer' | 'farmer'
+  name: string
+  factoryId: string
+  userId: string
+}
+
+/** Login — returns { token, user } or throws on failure */
+export async function authLogin(payload: {
+  role: AuthUser['role']
+  loginId: string
+  password?: string
+  otp?: string
+}): Promise<{ token: string; user: AuthUser }> {
+  const r = await fetch(buildUrl('/api/auth/login'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!r.ok) {
+    const body = await r.json().catch(() => ({}))
+    throw new Error((body as { error?: string }).error || 'Login failed')
+  }
+  return r.json()
+}
+
+/** Request OTP for farmer login */
+export async function authRequestOtp(phone: string): Promise<{ ok: boolean; message: string; debugOtp?: string }> {
+  const r = await fetch(buildUrl('/api/auth/request-otp'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone }),
+  })
+  if (!r.ok) throw new Error('OTP request failed')
+  return r.json()
+}
+
+/** Verify token and return current user */
+export async function authMe(): Promise<AuthUser | null> {
+  const token = getToken()
+  if (!token) return null
+  try {
+    const r = await fetch(buildUrl('/api/auth/me'), {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!r.ok) return null
+    const body = await r.json() as { user: AuthUser }
+    return body.user
+  } catch {
+    return null
+  }
+}
 
 export async function fetchFarmers() {
   const remote = await api<{ farmers: typeof FARMERS }>("/api/farmers");
@@ -42,6 +110,7 @@ export async function fetchFarmer(id: string) {
   return FARMERS.find((f) => f.id === id) ?? null;
 }
 
+// ── Farmer registration (protected) ─────────────────────
 export async function registerFarmer(data: {
   name: string;
   phone: string;
@@ -53,7 +122,7 @@ export async function registerFarmer(data: {
   try {
     const r = await fetch(buildUrl("/api/farmers"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders(),
       body: JSON.stringify(data),
     });
     if (!r.ok) return null;
@@ -195,7 +264,7 @@ export async function recalculateAllScores() {
   }
 }
 
-// ── Delivery creation (triggers SMS) ─────────────────
+// ── Delivery creation (protected) ───────────────────────
 export async function createDelivery(data: {
   farmerId: string;
   kg: number;
@@ -203,9 +272,9 @@ export async function createDelivery(data: {
   rate?: number;
 }) {
   try {
-    const r = await fetch("/api/deliveries", {
+    const r = await fetch(buildUrl("/api/deliveries"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders(),
       body: JSON.stringify(data),
     });
     if (!r.ok) return null;
@@ -215,7 +284,7 @@ export async function createDelivery(data: {
   }
 }
 
-// ── M-Pesa B2C ──────────────────────────────────────────
+// ── M-Pesa B2C (protected) ──────────────────────────────
 export async function postDisburse(body: {
   phone: string;
   amount: number;
@@ -226,7 +295,7 @@ export async function postDisburse(body: {
   try {
     const r = await fetch(buildUrl("/api/mpesa/disburse"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders(),
       body: JSON.stringify(body),
     });
     if (!r.ok) return null;
@@ -243,12 +312,12 @@ export async function postDisburse(body: {
   }
 }
 
-// ── Bulk Disburse All ────────────────────────────────────
+// ── Bulk Disburse All (protected) ───────────────────────
 export async function postDisburseAll(farmerIds?: string[]) {
   try {
     const r = await fetch(buildUrl("/api/mpesa/disburse-all"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders(),
       body: JSON.stringify({ farmerIds }),
     });
     if (!r.ok) return null;

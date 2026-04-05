@@ -9,8 +9,9 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const mpesaService = require('./services/MpesaService');
 // route modules
-const mpesaRoutes = require('./routes/mpesaRoutes');
-const apiRoutes = require('./routes/api');
+const mpesaRoutes  = require('./routes/mpesaRoutes');
+const apiRoutes    = require('./routes/api');
+const authRoutes   = require('./routes/authRoutes');
 
 const app = express();
 
@@ -46,6 +47,7 @@ app.get('/health', (req, res) => {
 });
 
 // ── Routes
+app.use('/api/auth', authRoutes);   // Public auth — mounted BEFORE rate limiter
 app.use('/api', apiRoutes);
 
 // ── Global Error Handler
