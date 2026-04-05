@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { fetchComplaints } from '../lib/api'
-import { COMPLAINTS } from '../data/seed'
+import type { Complaint } from '../types'
 
-type Row = (typeof COMPLAINTS)[0]
+type Row = Complaint
 
 export function CommunicationsPage() {
   const [rows, setRows] = useState<Row[]>([])

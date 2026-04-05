@@ -3,9 +3,9 @@ import { MpesaBadge } from '../components/MpesaBadge'
 import { Money } from '../components/Money'
 import { PaymentStatusPill } from '../components/PaymentStatusPill'
 import { fetchRecentPayments } from '../lib/api'
-import { RECENT_PAYMENTS } from '../data/seed'
+import type { PaymentRow } from '../types'
 
-type Row = (typeof RECENT_PAYMENTS)[0]
+type Row = PaymentRow
 
 export function PaymentsPage() {
   const [rows, setRows] = useState<Row[]>([])

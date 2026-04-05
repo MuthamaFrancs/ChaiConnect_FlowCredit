@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { PaymentStatusPill } from '../components/PaymentStatusPill'
 import { Money } from '../components/Money'
 import { fetchDeliveries } from '../lib/api'
-import { DELIVERIES } from '../data/seed'
+import type { Delivery } from '../types'
 
-type Row = (typeof DELIVERIES)[0]
+type Row = Delivery
 
 export function DeliveriesPage() {
   const [rows, setRows] = useState<Row[]>([])
