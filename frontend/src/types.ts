@@ -106,3 +106,37 @@ export interface CreditLedgerLine {
   /** Human-readable reason this transaction helps or hurts the score */
   scoringSignal: string
 }
+
+export interface Wallet {
+  id: string
+  farmerId: string
+  balance: number
+  pendingBalance: number
+  totalReceived: number
+  totalWithdrawn: number
+  updatedAt: string
+}
+
+export type WalletTxType =
+  | 'deposit'
+  | 'withdrawal'
+  | 'loan_disbursement'
+  | 'loan_repayment'
+  | 'cooperative_payment'
+
+export interface WalletTx {
+  id: string
+  farmerId: string
+  walletId: string
+  type: WalletTxType
+  amount: number
+  grossAmount?: number
+  deduction?: number
+  deductionType?: string
+  status: 'pending' | 'completed' | 'failed'
+  reference?: string
+  mpesaReceipt?: string
+  balanceAfter?: number
+  note?: string
+  createdAt: string
+}

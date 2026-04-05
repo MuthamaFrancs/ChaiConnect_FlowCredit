@@ -1,4 +1,4 @@
-import type { Complaint, Delivery, Farmer, Loan, MpesaTx, PaymentRow } from '../types'
+import type { Complaint, Delivery, Farmer, Loan, MpesaTx, PaymentRow, Wallet, WalletTx } from '../types'
 
 const API_BASE = (import.meta.env.VITE_API_URL as string) || ''
 
@@ -248,4 +248,40 @@ export async function postSimulateB2C(body: Record<string, unknown>): Promise<{
   steps: { label: string; ms: number }[]; payload: Record<string, unknown>
 } | null> {
   return post('/api/mpesa/simulate-b2c', body)
+}
+
+// ── Wallet ────────────────────────────────────────────────
+export async function fetchWallet(farmerId: string): Promise<{ wallet: Wallet; farmer: Farmer | null } | null> {
+  return get(`/api/wallet/${farmerId}`)
+}
+
+export async function fetchWalletTxns(farmerId: string, limit = 20, offset = 0): Promise<{ transactions: WalletTx[] }> {
+  const d = await get<{ transactions: WalletTx[] }>(`/api/wallet/${farmerId}/txns?limit=${limit}&offset=${offset}`)
+  return d ?? { transactions: [] }
+}
+
+export async function walletDeposit(farmerId: string, body: {
+  amount: number
+  grossAmount?: number
+  deduction?: number
+  deductionType?: string
+  reference?: string
+  mpesaReceipt?: string
+  note?: string
+}): Promise<{ ok: boolean; wallet: Wallet; tx: WalletTx } | null> {
+  return post(`/api/wallet/${farmerId}/deposit`, body)
+}
+
+export async function walletWithdraw(farmerId: string, body: {
+  amount: number
+  phone?: string
+}): Promise<{
+  ok: boolean
+  simulated: boolean
+  ref: string
+  wallet: Wallet
+  tx: WalletTx
+  message: string
+} | null> {
+  return post(`/api/wallet/${farmerId}/withdraw`, body)
 }
