@@ -1,28 +1,53 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { DELIVERIES, FARMERS, LOANS, MPESA_FEED } from '../data/seed'
 import { useApp } from '../context/AppProvider'
+import { fetchFarmers, fetchLoans } from '../lib/api'
+import type { Farmer, Loan } from '../types'
 
 export function GlobalSearch() {
   const { searchOpen, setSearchOpen } = useApp()
   const [q, setQ] = useState('')
+  const [farmers, setFarmers] = useState<Farmer[]>([])
+  const [loans, setLoans] = useState<Loan[]>([])
+  const [loading, setLoading] = useState(false)
   const nav = useNavigate()
+  const inputRef = useRef<HTMLInputElement>(null)
 
-  const results = useMemo(() => {
-    const qq = q.trim().toLowerCase()
-    if (!qq) return { farmers: [] as typeof FARMERS, deliveries: [], tx: [], loans: [] as typeof LOANS }
-    return {
-      farmers: FARMERS.filter(
-        (f) =>
-          f.name.toLowerCase().includes(qq) ||
-          f.memberNo.toLowerCase().includes(qq) ||
-          f.phone.includes(qq),
-      ).slice(0, 6),
-      deliveries: DELIVERIES.filter((d) => d.id.toLowerCase().includes(qq)).slice(0, 5),
-      tx: MPESA_FEED.filter((t) => t.id.toLowerCase().includes(qq)).slice(0, 5),
-      loans: LOANS.filter((l) => l.farmerName.toLowerCase().includes(qq)).slice(0, 5),
-    }
-  }, [q])
+  // Load data when search opens
+  useEffect(() => {
+    if (!searchOpen) { setQ(''); return }
+    inputRef.current?.focus()
+    if (farmers.length > 0) return
+    setLoading(true)
+    Promise.all([fetchFarmers(), fetchLoans()]).then(([f, l]) => {
+      setFarmers(f)
+      setLoans(l)
+      setLoading(false)
+    })
+  }, [searchOpen])
+
+  // Escape key closes
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSearchOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [setSearchOpen])
+
+  const qq = q.trim().toLowerCase()
+  const filteredFarmers = qq
+    ? farmers.filter(f =>
+        f.name.toLowerCase().includes(qq) ||
+        (f.memberNo || '').toLowerCase().includes(qq) ||
+        (f.phone || '').includes(qq),
+      ).slice(0, 6)
+    : farmers.slice(0, 4)
+
+  const filteredLoans = qq
+    ? loans.filter(l =>
+        (l.farmerName || '').toLowerCase().includes(qq) ||
+        (l.id || '').toLowerCase().includes(qq),
+      ).slice(0, 5)
+    : loans.slice(0, 3)
 
   if (!searchOpen) return null
 
@@ -31,25 +56,17 @@ export function GlobalSearch() {
       role="dialog"
       aria-modal
       style={{
-        position: 'fixed',
-        inset: 0,
+        position: 'fixed', inset: 0,
         background: 'rgba(14, 20, 18, 0.72)',
-        zIndex: 200,
-        display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'center',
+        zIndex: 200, display: 'flex',
+        alignItems: 'flex-start', justifyContent: 'center',
         padding: '8vh 16px',
       }}
       onMouseDown={() => setSearchOpen(false)}
     >
       <div
         className="card-surface"
-        style={{
-          width: 'min(640px, 100%)',
-          maxHeight: '80vh',
-          overflow: 'auto',
-          padding: 20,
-        }}
+        style={{ width: 'min(640px, 100%)', maxHeight: '80vh', overflow: 'auto', padding: 20 }}
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -57,79 +74,53 @@ export function GlobalSearch() {
           <span style={{ color: 'var(--muted)', fontSize: 13 }}>Esc / click outside</span>
         </div>
         <input
+          ref={inputRef}
           className="input"
           autoFocus
-          placeholder="Farmers, deliveries, loans…"
+          placeholder="Farmers, loans, members…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           style={{ marginTop: 12 }}
         />
-        <div style={{ marginTop: 16, display: 'grid', gap: 18 }}>
-          <Group title="Farmers">
-            {results.farmers.map((f) => (
-              <button
-                key={f.id}
-                className="btn btn-ghost"
-                style={{ width: '100%', justifyContent: 'flex-start' }}
-                onClick={() => {
-                  setSearchOpen(false)
-                  nav(`/app/farmers/${f.id}`)
-                }}
-              >
-                {f.name} · {f.memberNo}
-              </button>
-            ))}
-            {!results.farmers.length && <Muted>No matches</Muted>}
-          </Group>
-          <Group title="Deliveries">
-            {results.deliveries.map((d) => (
-              <button
-                key={d.id}
-                className="btn btn-ghost"
-                style={{ width: '100%', justifyContent: 'flex-start' }}
-                onClick={() => {
-                  setSearchOpen(false)
-                  nav('/app/deliveries')
-                }}
-              >
-                {d.id} · {d.kg} kg
-              </button>
-            ))}
-            {!results.deliveries.length && q && <Muted>No matches</Muted>}
-          </Group>
-          <Group title="Transactions">
-            {results.tx.map((t) => (
-              <button
-                key={t.id}
-                className="btn btn-ghost"
-                style={{ width: '100%', justifyContent: 'flex-start' }}
-                onClick={() => {
-                  setSearchOpen(false)
-                  nav('/flowcredit/transactions')
-                }}
-              >
-                {t.type} · {t.id}
-              </button>
-            ))}
-            {!results.tx.length && q && <Muted>No matches</Muted>}
-          </Group>
-          <Group title="Loans">
-            {results.loans.map((l) => (
-              <button
-                key={l.id}
-                className="btn btn-ghost"
-                style={{ width: '100%', justifyContent: 'flex-start' }}
-                onClick={() => {
-                  setSearchOpen(false)
-                  nav('/flowcredit/loans')
-                }}
-              >
-                {l.farmerName} · {l.status}
-              </button>
-            ))}
-            {!results.loans.length && q && <Muted>No matches</Muted>}
-          </Group>
-        </div>
+
+        {loading && (
+          <div style={{ padding: 20, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+            Loading…
+          </div>
+        )}
+
+        {!loading && (
+          <div style={{ marginTop: 16, display: 'grid', gap: 18 }}>
+            <Group title="Farmers">
+              {filteredFarmers.map((f) => (
+                <button
+                  key={f.id}
+                  className="btn btn-ghost"
+                  style={{ width: '100%', justifyContent: 'flex-start' }}
+                  onClick={() => { setSearchOpen(false); nav(`/app/farmers/${f.id}`) }}
+                >
+                  {f.name} · {f.memberNo} · <span style={{ color: 'var(--muted)', fontSize: 12 }}>{f.phone}</span>
+                </button>
+              ))}
+              {filteredFarmers.length === 0 && <Muted>{qq ? 'No matching farmers' : 'No farmers yet'}</Muted>}
+            </Group>
+
+            <Group title="Loans">
+              {filteredLoans.map((l) => (
+                <button
+                  key={l.id}
+                  className="btn btn-ghost"
+                  style={{ width: '100%', justifyContent: 'flex-start' }}
+                  onClick={() => { setSearchOpen(false); nav('/flowcredit/loans') }}
+                >
+                  {l.farmerName} · <span className="chip" style={{ fontSize: 11 }}>{l.status}</span>
+                  {' '}· KSh {Number(l.amount || 0).toLocaleString()}
+                </button>
+              ))}
+              {filteredLoans.length === 0 && <Muted>{qq ? 'No matching loans' : 'No loans yet'}</Muted>}
+            </Group>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -138,16 +129,7 @@ export function GlobalSearch() {
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <div
-        style={{
-          fontSize: 11,
-          fontWeight: 800,
-          letterSpacing: '0.08em',
-          color: 'var(--muted)',
-          marginBottom: 8,
-          fontFamily: 'var(--font-display)',
-        }}
-      >
+      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--muted)', marginBottom: 8, fontFamily: 'var(--font-display)' }}>
         {title}
       </div>
       <div style={{ display: 'grid', gap: 6 }}>{children}</div>

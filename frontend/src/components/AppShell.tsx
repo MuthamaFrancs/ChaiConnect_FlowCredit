@@ -16,6 +16,7 @@ export function AppShell({ flowcredit }: { flowcredit?: boolean }) {
   const accent = flowcredit ? 'var(--gold)' : 'var(--fresh)'
   const isNarrow = useMediaQuery('(max-width: 900px)')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const role = auth?.role ?? 'clerk'
 
   const closeSidebar = () => setSidebarOpen(false)
 
@@ -48,12 +49,22 @@ export function AppShell({ flowcredit }: { flowcredit?: boolean }) {
               <div style={{ fontSize: 11, opacity: 0.65 }}>Operations & FlowCredit</div>
             </div>
           </div>
+          <div style={{
+            marginTop: 12, padding: '6px 10px', borderRadius: 8,
+            background: role === 'admin' ? 'rgba(82,183,136,0.18)' : role === 'clerk' ? 'rgba(59,130,246,0.18)' : 'rgba(139,92,246,0.18)',
+            fontSize: 11, fontWeight: 700,
+            color: role === 'admin' ? 'var(--fresh)' : role === 'clerk' ? '#60a5fa' : '#c4b5fd',
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            {role === 'admin' ? '🏛️ Admin' : role === 'clerk' ? '📋 Clerk' : '🌾 Field Officer'}
+            <span style={{ opacity: 0.6, fontWeight: 400 }}>· {auth?.name?.split(' ')[0]}</span>
+          </div>
         </div>
 
         <nav style={{ flex: 1, overflow: 'auto', padding: '12px 10px' }}>
           <NavGroup label="Overview" />
           <NavLink to="/app" end className={navClass} onClick={() => isNarrow && closeSidebar()}>
-            Dashboard
+            {role === 'admin' ? '🏛️ Platform Overview' : role === 'clerk' ? '📋 Clerk Workbench' : '🌾 Field Intelligence'}
           </NavLink>
 
           <NavGroup label="Farmers" />
@@ -65,40 +76,56 @@ export function AppShell({ flowcredit }: { flowcredit?: boolean }) {
           <NavLink className={navClass} to="/app/deliveries" onClick={() => isNarrow && closeSidebar()}>
             Deliveries
           </NavLink>
-          <NavLink className={navClass} to="/app/quality" onClick={() => isNarrow && closeSidebar()}>
-            Quality
-          </NavLink>
-          <NavLink className={navClass} to="/app/payments" onClick={() => isNarrow && closeSidebar()}>
-            Payments
-          </NavLink>
+          {(role === 'admin' || role === 'clerk') && (
+            <NavLink className={navClass} to="/app/quality" onClick={() => isNarrow && closeSidebar()}>
+              Quality
+            </NavLink>
+          )}
+          {(role === 'admin' || role === 'clerk') && (
+            <NavLink className={navClass} to="/app/payments" onClick={() => isNarrow && closeSidebar()}>
+              Payments
+            </NavLink>
+          )}
 
-          <NavGroup label="FlowCredit" />
-          <NavLink className={navClass} to="/flowcredit" end onClick={() => isNarrow && closeSidebar()}>
-            FlowCredit Hub
-          </NavLink>
-          <NavLink className={navClass} to="/flowcredit/scoring" onClick={() => isNarrow && closeSidebar()} style={{ paddingLeft: 28, fontSize: 13 }}>
-            Credit Scoring
-          </NavLink>
-          <NavLink className={navClass} to="/flowcredit/loans" onClick={() => isNarrow && closeSidebar()} style={{ paddingLeft: 28, fontSize: 13 }}>
-            Loans
-          </NavLink>
-          <NavLink className={navClass} to="/flowcredit/disburse" onClick={() => isNarrow && closeSidebar()} style={{ paddingLeft: 28, fontSize: 13 }}>
-            B2C Disburse
-          </NavLink>
-          <NavLink className={navClass} to="/flowcredit/transactions" onClick={() => isNarrow && closeSidebar()} style={{ paddingLeft: 28, fontSize: 13 }}>
-            Daraja API Feed
-          </NavLink>
+          {(role === 'admin' || role === 'officer') && (
+            <>
+              <NavGroup label="FlowCredit" />
+              <NavLink className={navClass} to="/flowcredit" end onClick={() => isNarrow && closeSidebar()}>
+                FlowCredit Hub
+              </NavLink>
+              <NavLink className={navClass} to="/flowcredit/scoring" onClick={() => isNarrow && closeSidebar()} style={{ paddingLeft: 28, fontSize: 13 }}>
+                Credit Scoring
+              </NavLink>
+              <NavLink className={navClass} to="/flowcredit/loans" onClick={() => isNarrow && closeSidebar()} style={{ paddingLeft: 28, fontSize: 13 }}>
+                Loans
+              </NavLink>
+              {role === 'admin' && (
+                <>
+                  <NavLink className={navClass} to="/flowcredit/disburse" onClick={() => isNarrow && closeSidebar()} style={{ paddingLeft: 28, fontSize: 13 }}>
+                    B2C Disburse
+                  </NavLink>
+                  <NavLink className={navClass} to="/flowcredit/transactions" onClick={() => isNarrow && closeSidebar()} style={{ paddingLeft: 28, fontSize: 13 }}>
+                    Daraja API Feed
+                  </NavLink>
+                </>
+              )}
+            </>
+          )}
 
           <NavGroup label="More" />
           <NavLink className={navClass} to="/app/communications" onClick={() => isNarrow && closeSidebar()}>
             Communications
           </NavLink>
-          <NavLink className={navClass} to="/app/reports" onClick={() => isNarrow && closeSidebar()}>
-            Reports
-          </NavLink>
-          <NavLink className={navClass} to="/app/settings" onClick={() => isNarrow && closeSidebar()}>
-            Settings
-          </NavLink>
+          {(role === 'admin' || role === 'officer') && (
+            <NavLink className={navClass} to="/app/reports" onClick={() => isNarrow && closeSidebar()}>
+              Reports
+            </NavLink>
+          )}
+          {role === 'admin' && (
+            <NavLink className={navClass} to="/app/settings" onClick={() => isNarrow && closeSidebar()}>
+              Settings
+            </NavLink>
+          )}
 
           <NavGroup label="Farmer Portal" />
           <NavLink className={navClass} to="/portal" onClick={() => isNarrow && closeSidebar()} style={{ opacity: 0.75 }}>

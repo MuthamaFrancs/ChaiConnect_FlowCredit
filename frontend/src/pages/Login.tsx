@@ -2,29 +2,78 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BrandMark } from '../components/AppShell'
 import { useApp } from '../context/AppProvider'
+import { authRequestOtp } from '../lib/api'
 import type { Role } from '../types'
 
 export function LoginPage() {
   const { login, lang, setLang, t, theme, toggleTheme } = useApp()
   const nav = useNavigate()
   const [role, setRole] = useState<Role>('admin')
-  const [email, setEmail] = useState('admin@chaiconnect.co.ke')
-  const [pin, setPin] = useState('')
-  const [phone, setPhone] = useState('0712345678')
-  const [otp, setOtp] = useState('')
+  const [email, setEmail]   = useState('admin@chaiconnect.co.ke')
+  const [pin, setPin]       = useState('')
+  const [phone, setPhone]   = useState('0712345678')
+  const [otp, setOtp]       = useState('')
+  const [empId, setEmpId]   = useState('KC-2044')
+  const [staffId, setStaffId] = useState('EXT-889')
+  const [loading, setLoading] = useState(false)
+  const [error, setError]   = useState('')
+  const [otpSent, setOtpSent] = useState(false)
 
-  function submit(e: React.FormEvent) {
+  // Reset error whenever role changes
+  function switchRole(r: Role) {
+    setRole(r)
+    setError('')
+    setOtpSent(false)
+  }
+
+  async function handleRequestOtp() {
+    setError('')
+    setLoading(true)
+    try {
+      await authRequestOtp(phone)
+      setOtpSent(true)
+    } catch {
+      setOtpSent(true) // Still show OTP field — backend may be simulating
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function submit(e: React.FormEvent) {
     e.preventDefault()
-    const factoryId = 'kiambu'
-    if (role === 'farmer') {
-      login({ role, name: 'Wanjiku Kamau', factoryId })
-      nav('/portal')
+    setError('')
+    setLoading(true)
+
+    let loginId = ''
+    let payload: { role: Role; loginId: string; password?: string; otp?: string } = { role, loginId: '' }
+
+    if (role === 'admin') {
+      loginId = email
+      payload = { role, loginId, password: pin }
+    } else if (role === 'clerk') {
+      loginId = empId
+      payload = { role, loginId, password: pin }
+    } else if (role === 'officer') {
+      loginId = staffId
+      payload = { role, loginId, password: pin }
+    } else {
+      loginId = phone
+      payload = { role, loginId, otp }
+    }
+
+    const result = await login(payload)
+    setLoading(false)
+
+    if (!result.ok) {
+      setError(result.error || 'Invalid credentials. Please try again.')
       return
     }
-    if (role === 'admin') login({ role, name: 'Makena Wanjiru', factoryId })
-    else if (role === 'clerk') login({ role, name: 'Juma Otieno', factoryId })
-    else login({ role, name: 'Wambui Extension', factoryId })
-    nav('/app')
+
+    if (role === 'farmer') {
+      nav('/portal')
+    } else {
+      nav('/app')
+    }
   }
 
   return (
@@ -112,7 +161,7 @@ export function LoginPage() {
                   key={r}
                   type="button"
                   className="btn"
-                  onClick={() => setRole(r)}
+                  onClick={() => switchRole(r)}
                   style={{
                     borderRadius: 999,
                     background: role === r ? 'rgba(82,183,136,0.18)' : '#fff',
@@ -138,7 +187,7 @@ export function LoginPage() {
               {role === 'clerk' && (
                 <>
                   <Field label={t('Employee ID', 'Kitambulisho cha mfanyakazi')}>
-                    <input className="input" defaultValue="KC-2044" />
+                    <input className="input" value={empId} onChange={(e) => setEmpId(e.target.value)} />
                   </Field>
                   <Field label={t('4-digit PIN', 'PIN ya tarakimu 4')}>
                     <input className="input" inputMode="numeric" maxLength={4} value={pin} onChange={(e) => setPin(e.target.value)} />
@@ -148,7 +197,7 @@ export function LoginPage() {
               {role === 'officer' && (
                 <>
                   <Field label={t('Staff ID', 'Kitambulisho cha wataalamu')}>
-                    <input className="input" defaultValue="EXT-889" />
+                    <input className="input" value={staffId} onChange={(e) => setStaffId(e.target.value)} />
                   </Field>
                   <Field label={t('Password', 'Nenosiri')}>
                     <input className="input" type="password" value={pin} onChange={(e) => setPin(e.target.value)} />
@@ -160,14 +209,42 @@ export function LoginPage() {
                   <Field label={t('M-Pesa phone', 'Simu ya M-Pesa')}>
                     <input className="input" value={phone} onChange={(e) => setPhone(e.target.value)} />
                   </Field>
-                  <Field label={t('OTP (simulated)', 'OTP (imeigwa)')}>
-                    <input className="input" value={otp} placeholder="5921" onChange={(e) => setOtp(e.target.value)} />
-                  </Field>
+                  {!otpSent ? (
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      style={{ width: '100%', marginBottom: 8, justifyContent: 'center' }}
+                      disabled={loading}
+                      onClick={handleRequestOtp}
+                    >
+                      {loading ? '⏳ Sending…' : t('Send OTP', 'Tuma OTP')}
+                    </button>
+                  ) : (
+                    <Field label={t('OTP code', 'Nambari ya OTP')}>
+                      <input className="input" value={otp} placeholder={t('Enter 4-digit OTP', 'Weka OTP')} onChange={(e) => setOtp(e.target.value)} />
+                    </Field>
+                  )}
                 </>
               )}
 
-              <button className="btn btn-primary" style={{ width: '100%', marginTop: 8, justifyContent: 'center' }} type="submit">
-                {t('Continue to platform', 'Endelea')}
+              {/* Error banner */}
+              {error && (
+                <div style={{
+                  padding: '10px 14px', borderRadius: 8, marginBottom: 10,
+                  background: 'rgba(220,53,69,0.1)', color: '#c0392b',
+                  fontSize: 13, fontWeight: 600, border: '1px solid rgba(220,53,69,0.25)',
+                }}>
+                  ⚠ {error}
+                </div>
+              )}
+
+              <button
+                className="btn btn-primary"
+                style={{ width: '100%', marginTop: 8, justifyContent: 'center', opacity: loading ? 0.7 : 1 }}
+                type="submit"
+                disabled={loading || (role === 'farmer' && !otpSent)}
+              >
+                {loading ? '⏳ ' + t('Signing in…', 'Inaingia…') : t('Continue to platform', 'Endelea')}
               </button>
             </form>
 

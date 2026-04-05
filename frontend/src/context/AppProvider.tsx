@@ -1,319 +1,370 @@
+/**
+ * AppProvider — State management for ChaiConnect.
+ *
+ * Uses a lightweight context + useReducer pattern that mirrors
+ * the Zustand API surface exactly. Once `npm install zustand`
+ * succeeds on your machine, this file can be swapped for the
+ * Zustand version without touching any component.
+ *
+ * Exports:
+ *  useAppStore()    — auth, theme, lang, toasts, searchOpen
+ *  useFarmerStore() — farmer portal credit & disbursement state
+ *  useApp()         — backward-compat shim (reads both stores)
+ *  AppProvider      — wraps the app, restores JWT session, binds keyboard
+ */
 import {
   createContext,
   useCallback,
   useContext,
   useEffect,
   useMemo,
-  useState,
+  useReducer,
+  useRef,
   type ReactNode,
 } from 'react'
 import type { CreditLedgerLine, PendingFarmerDisbursement, Role } from '../types'
+import { authLogin, authMe, clearToken, setToken } from '../lib/api'
 
-export type Lang = 'en' | 'sw'
+export type Lang      = 'en' | 'sw'
 export type ThemeMode = 'light' | 'dark'
 
 export interface AuthUser {
-  role: Role
-  name: string
+  role:      Role
+  name:      string
   factoryId: string
+  userId?:   string
 }
 
 export interface ToastMessage {
-  id: string
+  id:   string
   text: string
 }
 
-const LS_PLATFORM = 'chaiconnect_platform'
-
-function defaultPlatform() {
-  const today = new Date().toISOString().slice(0, 10)
-  return {
-    pendingFarmerDisbursements: [
-      {
-        id: 'pd-coop-demo',
-        amount: 5200,
-        label: 'Net cooperative payment — March grading',
-        ref: 'COOP-MAR-02',
-        source: 'coop_payment' as const,
-        createdAt: today,
-      },
-    ] satisfies PendingFarmerDisbursement[],
-    creditLedgerLines: [
-      {
-        id: 'cl1',
-        date: '2025-02-15',
-        description: 'Co-op payment received',
-        amount: 18500,
-        direction: 'in' as const,
-        scoringSignal: '+ Stable monthly inflow',
-      },
-      {
-        id: 'cl2',
-        date: '2025-01-20',
-        description: 'M-Pesa B2C (FlowCredit trial)',
-        amount: 5000,
-        direction: 'in' as const,
-        scoringSignal: '+ On-time B2C confirmation',
-      },
-      {
-        id: 'cl3',
-        date: '2024-12-10',
-        description: 'Service fee (SMS)',
-        amount: 120,
-        direction: 'out' as const,
-        scoringSignal: 'Small recurring debits OK',
-      },
-    ] satisfies CreditLedgerLine[],
-    farmerCreditScore: 82,
-  }
+// ─────────────────────────────────────────────────────────────
+//  Persistence helpers
+// ─────────────────────────────────────────────────────────────
+function lsGet<T>(key: string, fallback: T): T {
+  try { const v = localStorage.getItem(key); return v ? (JSON.parse(v) as T) : fallback } catch { return fallback }
+}
+function lsSet(key: string, value: unknown) {
+  try { localStorage.setItem(key, JSON.stringify(value)) } catch { /* ignore */ }
+}
+function lsDel(key: string) {
+  try { localStorage.removeItem(key) } catch { /* ignore */ }
 }
 
-function loadPlatform() {
-  try {
-    const raw = localStorage.getItem(LS_PLATFORM)
-    if (raw) {
-      const j = JSON.parse(raw) as {
-        pendingFarmerDisbursements?: PendingFarmerDisbursement[]
-        creditLedgerLines?: CreditLedgerLine[]
-        farmerCreditScore?: number
-      }
-      if (
-        Array.isArray(j.pendingFarmerDisbursements) &&
-        Array.isArray(j.creditLedgerLines) &&
-        typeof j.farmerCreditScore === 'number'
-      ) {
-        return {
-          pendingFarmerDisbursements: j.pendingFarmerDisbursements,
-          creditLedgerLines: j.creditLedgerLines,
-          farmerCreditScore: j.farmerCreditScore,
-        }
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-  return defaultPlatform()
-}
-
-interface AppCtx {
-  lang: Lang
-  setLang: (l: Lang) => void
-  theme: ThemeMode
-  setTheme: (t: ThemeMode) => void
-  toggleTheme: () => void
-  auth: AuthUser | null
-  login: (u: AuthUser) => void
-  logout: () => void
+// ─────────────────────────────────────────────────────────────
+//  APP STORE
+// ─────────────────────────────────────────────────────────────
+interface AppState {
+  auth:       AuthUser | null
+  theme:      ThemeMode
+  lang:       Lang
   searchOpen: boolean
-  setSearchOpen: (v: boolean) => void
-  toasts: ToastMessage[]
-  pushToast: (text: string) => void
-  dismissToast: (id: string) => void
-  t: (en: string, sw: string) => string
-  pendingFarmerDisbursements: PendingFarmerDisbursement[]
-  creditLedgerLines: CreditLedgerLine[]
-  farmerCreditScore: number
-  acceptFarmerDisbursement: (id: string) => void
-  /** After staff completes a simulated B2C, farmer sees this in Wallet to confirm. */
-  queueStaffB2CForFarmer: (p: {
-    amount: number
-    label: string
-    ref: string
-  }) => void
+  toasts:     ToastMessage[]
 }
 
-const Ctx = createContext<AppCtx | null>(null)
+type AppAction =
+  | { type: 'SET_AUTH';        payload: AuthUser | null }
+  | { type: 'SET_THEME';       payload: ThemeMode }
+  | { type: 'SET_LANG';        payload: Lang }
+  | { type: 'SET_SEARCH';      payload: boolean }
+  | { type: 'PUSH_TOAST';      payload: ToastMessage }
+  | { type: 'DISMISS_TOAST';   payload: string }
 
+function appReducer(s: AppState, a: AppAction): AppState {
+  switch (a.type) {
+    case 'SET_AUTH':       return { ...s, auth: a.payload }
+    case 'SET_THEME':      return { ...s, theme: a.payload }
+    case 'SET_LANG':       return { ...s, lang: a.payload }
+    case 'SET_SEARCH':     return { ...s, searchOpen: a.payload }
+    case 'PUSH_TOAST':     return { ...s, toasts: [...s.toasts, a.payload] }
+    case 'DISMISS_TOAST':  return { ...s, toasts: s.toasts.filter(t => t.id !== a.payload) }
+    default:               return s
+  }
+}
+
+const initialAppState: AppState = {
+  auth:       null,
+  theme:      lsGet<ThemeMode>('cc_theme', 'light'),
+  lang:       lsGet<Lang>('cc_lang', 'en'),
+  searchOpen: false,
+  toasts:     [],
+}
+
+interface AppStoreCtx extends AppState {
+  setAuth:       (u: AuthUser | null) => void
+  setTheme:      (t: ThemeMode) => void
+  toggleTheme:   () => void
+  setLang:       (l: Lang) => void
+  setSearchOpen: (v: boolean) => void
+  pushToast:     (text: string) => void
+  dismissToast:  (id: string) => void
+  login:         (p: { role: Role; loginId: string; password?: string; otp?: string }) => Promise<{ ok: boolean; error?: string }>
+  logout:        () => void
+}
+
+const AppCtx = createContext<AppStoreCtx | null>(null)
+
+// ─────────────────────────────────────────────────────────────
+//  FARMER STORE
+// ─────────────────────────────────────────────────────────────
+interface FarmerState {
+  pendingFarmerDisbursements: PendingFarmerDisbursement[]
+  creditLedgerLines:          CreditLedgerLine[]
+  farmerCreditScore:          number
+}
+
+type FarmerAction =
+  | { type: 'ACCEPT';  payload: string }
+  | { type: 'QUEUE';   payload: PendingFarmerDisbursement }
+  | { type: 'ADD_LINE';payload: CreditLedgerLine }
+  | { type: 'SCORE';   payload: number }
+
+function farmerReducer(s: FarmerState, a: FarmerAction): FarmerState {
+  switch (a.type) {
+    case 'ACCEPT': return {
+      ...s,
+      pendingFarmerDisbursements: s.pendingFarmerDisbursements.filter(x => x.id !== a.payload),
+    }
+    case 'QUEUE': return {
+      ...s,
+      pendingFarmerDisbursements: [...s.pendingFarmerDisbursements, a.payload],
+    }
+    case 'ADD_LINE': return {
+      ...s,
+      creditLedgerLines: [a.payload, ...s.creditLedgerLines],
+    }
+    case 'SCORE': return { ...s, farmerCreditScore: a.payload }
+    default: return s
+  }
+}
+
+const initialFarmerState: FarmerState = lsGet('cc_farmer', {
+  pendingFarmerDisbursements: [],
+  creditLedgerLines:          [],
+  farmerCreditScore:          50,
+})
+
+interface FarmerStoreCtx extends FarmerState {
+  acceptFarmerDisbursement: (id: string) => void
+  queueStaffB2CForFarmer:   (p: { amount: number; label: string; ref: string }) => void
+}
+
+const FarmerCtx = createContext<FarmerStoreCtx | null>(null)
+
+// ─────────────────────────────────────────────────────────────
+//  DEMO FALLBACK (when backend is unreachable)
+// ─────────────────────────────────────────────────────────────
+const DEMO_USERS: Record<string, AuthUser> = {
+  'admin@chaiconnect.co.ke': { role: 'admin',   name: 'Makena Wanjiru',   factoryId: 'kiambu' },
+  'KC-2044':                 { role: 'clerk',   name: 'Juma Otieno',      factoryId: 'kiambu' },
+  'EXT-889':                 { role: 'officer', name: 'Wambui Extension', factoryId: 'kiambu' },
+  '0712345678':              { role: 'farmer',  name: 'Wanjiku Kamau',    factoryId: 'kiambu' },
+}
+const DEMO_PASSWORDS: Record<string, string> = {
+  'admin@chaiconnect.co.ke': 'Admin@1234',
+  'KC-2044':                 '2044',
+  'EXT-889':                 'Officer@1234',
+  '0712345678':              '5921',
+}
+
+// ─────────────────────────────────────────────────────────────
+//  AppProvider
+// ─────────────────────────────────────────────────────────────
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [lang, setLang] = useState<Lang>('en')
-  const [theme, setTheme] = useState<ThemeMode>(() => {
-    try {
-      return localStorage.getItem('chaiconnect_theme') === 'dark' ? 'dark' : 'light'
-    } catch {
-      return 'light'
-    }
-  })
+  const [appState, appDispatch] = useReducer(appReducer, initialAppState)
+  const [farmerState, farmerDispatch] = useReducer(farmerReducer, initialFarmerState)
 
+  // Persist theme & lang
+  useEffect(() => { lsSet('cc_theme', appState.theme) }, [appState.theme])
+  useEffect(() => { lsSet('cc_lang',  appState.lang)  }, [appState.lang])
+
+  // Persist farmer store
+  useEffect(() => { lsSet('cc_farmer', farmerState) }, [farmerState])
+
+  // Apply theme to DOM
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme)
-    try {
-      localStorage.setItem('chaiconnect_theme', theme)
-    } catch {
-      /* ignore */
-    }
-  }, [theme])
+    document.documentElement.setAttribute('data-theme', appState.theme)
+  }, [appState.theme])
 
-  const toggleTheme = useCallback(() => {
-    setTheme((t) => (t === 'light' ? 'dark' : 'light'))
+  // Restore JWT session on mount
+  useEffect(() => {
+    authMe()
+      .then(user => {
+        if (user) {
+          appDispatch({ type: 'SET_AUTH', payload: { role: user.role as Role, name: user.name, factoryId: user.factoryId, userId: user.userId } })
+        }
+      })
+      .catch(() => { /* offline — no-op */ })
   }, [])
 
-  const [auth, setAuth] = useState<AuthUser | null>(() => {
-    try {
-      const raw = localStorage.getItem('chaiconnect_auth')
-      return raw ? (JSON.parse(raw) as AuthUser) : null
-    } catch {
-      return null
-    }
-  })
-  const [searchOpen, setSearchOpen] = useState(false)
-  const [toasts, setToasts] = useState<ToastMessage[]>([])
+  // Toast auto-dismiss ref map
+  const toastTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
-  const [pendingFarmerDisbursements, setPendingFarmerDisbursements] = useState<
-    PendingFarmerDisbursement[]
-  >(() => loadPlatform().pendingFarmerDisbursements)
-  const [creditLedgerLines, setCreditLedgerLines] = useState<CreditLedgerLine[]>(
-    () => loadPlatform().creditLedgerLines,
-  )
-  const [farmerCreditScore, setFarmerCreditScore] = useState(
-    () => loadPlatform().farmerCreditScore,
-  )
+  const pushToast = useCallback((text: string) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`
+    appDispatch({ type: 'PUSH_TOAST', payload: { id, text } })
+    toastTimers.current[id] = setTimeout(() => {
+      appDispatch({ type: 'DISMISS_TOAST', payload: id })
+      delete toastTimers.current[id]
+    }, 6000)
+  }, [])
 
-  useEffect(() => {
-    if (auth) localStorage.setItem('chaiconnect_auth', JSON.stringify(auth))
-    else localStorage.removeItem('chaiconnect_auth')
-  }, [auth])
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        LS_PLATFORM,
-        JSON.stringify({
-          pendingFarmerDisbursements,
-          creditLedgerLines,
-          farmerCreditScore,
-        }),
-      )
-    } catch {
-      /* ignore */
-    }
-  }, [pendingFarmerDisbursements, creditLedgerLines, farmerCreditScore])
-
+  // Global keyboard shortcut — Cmd+K opens search
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault()
-        setSearchOpen((o) => !o)
+        appDispatch({ type: 'SET_SEARCH', payload: true })
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const login = useCallback((u: AuthUser) => setAuth(u), [])
-  const logout = useCallback(() => setAuth(null), [])
-
-  const pushToast = useCallback((text: string) => {
-    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`
-    setToasts((t) => [...t, { id, text }])
-    window.setTimeout(() => {
-      setToasts((t) => t.filter((x) => x.id !== id))
-    }, 6000)
+  // ── App actions ──────────────────────────────────────────
+  const login = useCallback(async (payload: { role: Role; loginId: string; password?: string; otp?: string }): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      const { token, user } = await authLogin(payload)
+      setToken(token)
+      const authUser: AuthUser = { role: user.role as Role, name: user.name, factoryId: user.factoryId, userId: user.userId }
+      appDispatch({ type: 'SET_AUTH', payload: authUser })
+      return { ok: true }
+    } catch (err: unknown) {
+      // Backend unreachable — demo fallback
+      const errMsg = err instanceof Error ? err.message : 'Login failed'
+      console.warn('Backend login failed, using demo fallback:', errMsg)
+      const demo = DEMO_USERS[payload.loginId]
+      if (demo && demo.role === payload.role) {
+        const provided = payload.password || payload.otp || ''
+        if (provided !== DEMO_PASSWORDS[payload.loginId]) {
+          return { ok: false, error: 'Invalid credentials' }
+        }
+        appDispatch({ type: 'SET_AUTH', payload: demo })
+        return { ok: true }
+      }
+      return { ok: false, error: errMsg }
+    }
   }, [])
 
-  const dismissToast = useCallback((id: string) => {
-    setToasts((t) => t.filter((x) => x.id !== id))
+  const logout = useCallback(() => {
+    clearToken()
+    lsDel('cc_farmer')
+    appDispatch({ type: 'SET_AUTH', payload: null })
   }, [])
 
-  const tr = useCallback(
-    (en: string, sw: string) => (lang === 'sw' ? sw : en),
-    [lang],
-  )
+  const appCtxValue: AppStoreCtx = useMemo(() => ({
+    ...appState,
+    setAuth:       (u) => appDispatch({ type: 'SET_AUTH',   payload: u }),
+    setTheme:      (t) => appDispatch({ type: 'SET_THEME',  payload: t }),
+    toggleTheme:   ()  => appDispatch({ type: 'SET_THEME',  payload: appState.theme === 'light' ? 'dark' : 'light' }),
+    setLang:       (l) => appDispatch({ type: 'SET_LANG',   payload: l }),
+    setSearchOpen: (v) => appDispatch({ type: 'SET_SEARCH', payload: v }),
+    pushToast,
+    dismissToast:  (id) => appDispatch({ type: 'DISMISS_TOAST', payload: id }),
+    login,
+    logout,
+  }), [appState, pushToast, login, logout])
 
-  const acceptFarmerDisbursement = useCallback(
-    (id: string) => {
-      const row = pendingFarmerDisbursements.find((p) => p.id === id)
-      if (!row) return
-      const lineId = `cl-${Date.now()}`
-      const line: CreditLedgerLine = {
-        id: lineId,
-        date: new Date().toISOString().slice(0, 10),
-        description: `Accepted: ${row.label}`,
-        amount: row.amount,
-        direction: 'in',
-        scoringSignal:
-          row.source === 'flowcredit_b2c'
-            ? '+ B2C confirmed — improves FlowCredit limit'
-            : '+ Cooperative inflow acknowledged — repayment signal',
-      }
-      setPendingFarmerDisbursements((p) => p.filter((x) => x.id !== id))
-      setCreditLedgerLines((l) => [line, ...l])
-      setFarmerCreditScore((s) => Math.min(100, s + 2))
-      pushToast(
-        lang === 'sw'
-          ? 'Imethibitishwa. Rekodi imeongezwa kwa alama ya mkopo.'
-          : 'Confirmed. Record added to your credit history.',
-      )
-    },
-    [lang, pendingFarmerDisbursements, pushToast],
-  )
+  // ── Farmer actions ───────────────────────────────────────
+  const acceptFarmerDisbursement = useCallback((id: string) => {
+    const row = farmerState.pendingFarmerDisbursements.find(p => p.id === id)
+    if (!row) return
+    const line: CreditLedgerLine = {
+      id:          `cl-${Date.now()}`,
+      date:        new Date().toISOString().slice(0, 10),
+      description: `Accepted: ${row.label}`,
+      amount:      row.amount,
+      direction:   'in',
+      scoringSignal: row.source === 'flowcredit_b2c'
+        ? '+ B2C confirmed — improves FlowCredit limit'
+        : '+ Cooperative inflow acknowledged — repayment signal',
+    }
+    farmerDispatch({ type: 'ACCEPT',   payload: id })
+    farmerDispatch({ type: 'ADD_LINE', payload: line })
+    farmerDispatch({ type: 'SCORE',    payload: Math.min(100, farmerState.farmerCreditScore + 2) })
+    pushToast('Confirmed. Record added to your credit history.')
+  }, [farmerState, pushToast])
 
-  const queueStaffB2CForFarmer = useCallback(
-    (p: { amount: number; label: string; ref: string }) => {
-      const item: PendingFarmerDisbursement = {
-        id: `pd-b2c-${Date.now()}`,
-        amount: p.amount,
-        label: p.label,
-        ref: p.ref,
-        source: 'flowcredit_b2c',
-        createdAt: new Date().toISOString().slice(0, 10),
-      }
-      setPendingFarmerDisbursements((list) => [...list, item])
-      pushToast(
-        lang === 'sw'
-          ? 'B2C imehifadhiwa. Mkulima ataona kwenye Wallet kuidhinisha.'
-          : 'B2C queued. Farmer can accept in Wallet (M-Pesa & score).',
-      )
-    },
-    [lang, pushToast],
-  )
+  const queueStaffB2CForFarmer = useCallback((p: { amount: number; label: string; ref: string }) => {
+    const item: PendingFarmerDisbursement = {
+      id:        `pd-b2c-${Date.now()}`,
+      amount:    p.amount,
+      label:     p.label,
+      ref:       p.ref,
+      source:    'flowcredit_b2c',
+      createdAt: new Date().toISOString().slice(0, 10),
+    }
+    farmerDispatch({ type: 'QUEUE', payload: item })
+    pushToast('B2C queued. Farmer can accept in Wallet (M-Pesa & score).')
+  }, [pushToast])
 
-  const value = useMemo<AppCtx>(
-    () => ({
-      lang,
-      setLang,
-      theme,
-      setTheme,
-      toggleTheme,
-      auth,
-      login,
-      logout,
-      searchOpen,
-      setSearchOpen,
-      toasts,
-      pushToast,
-      dismissToast,
-      t: tr,
-      pendingFarmerDisbursements,
-      creditLedgerLines,
-      farmerCreditScore,
-      acceptFarmerDisbursement,
-      queueStaffB2CForFarmer,
-    }),
-    [
-      acceptFarmerDisbursement,
-      auth,
-      creditLedgerLines,
-      dismissToast,
-      farmerCreditScore,
-      lang,
-      login,
-      logout,
-      pendingFarmerDisbursements,
-      pushToast,
-      queueStaffB2CForFarmer,
-      searchOpen,
-      theme,
-      toasts,
-      tr,
-      toggleTheme,
-    ],
-  )
+  const farmerCtxValue: FarmerStoreCtx = useMemo(() => ({
+    ...farmerState,
+    acceptFarmerDisbursement,
+    queueStaffB2CForFarmer,
+  }), [farmerState, acceptFarmerDisbursement, queueStaffB2CForFarmer])
 
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>
+  return (
+    <AppCtx.Provider value={appCtxValue}>
+      <FarmerCtx.Provider value={farmerCtxValue}>
+        {children}
+      </FarmerCtx.Provider>
+    </AppCtx.Provider>
+  )
 }
 
+// ─────────────────────────────────────────────────────────────
+//  Store hooks (mirror Zustand API)
+// ─────────────────────────────────────────────────────────────
+export function useAppStore() {
+  const ctx = useContext(AppCtx)
+  if (!ctx) throw new Error('useAppStore must be inside AppProvider')
+  return ctx
+}
+
+export function useFarmerStore() {
+  const ctx = useContext(FarmerCtx)
+  if (!ctx) throw new Error('useFarmerStore must be inside AppProvider')
+  return ctx
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Backward-compatible useApp() shim
+//  All existing components that do `const { x } = useApp()` work unchanged.
+// ─────────────────────────────────────────────────────────────
 export function useApp() {
-  const x = useContext(Ctx)
-  if (!x) throw new Error('useApp needs AppProvider')
-  return x
+  const app    = useAppStore()
+  const farmer = useFarmerStore()
+  const { lang } = app
+
+  const t = useCallback((en: string, sw: string) => (lang === 'sw' ? sw : en), [lang])
+
+  return {
+    // App store
+    auth:          app.auth,
+    theme:         app.theme,
+    setTheme:      app.setTheme,
+    toggleTheme:   app.toggleTheme,
+    lang,
+    setLang:       app.setLang,
+    searchOpen:    app.searchOpen,
+    setSearchOpen: app.setSearchOpen,
+    toasts:        app.toasts,
+    pushToast:     app.pushToast,
+    dismissToast:  app.dismissToast,
+    login:         app.login,
+    logout:        app.logout,
+
+    // Farmer store
+    pendingFarmerDisbursements: farmer.pendingFarmerDisbursements,
+    creditLedgerLines:          farmer.creditLedgerLines,
+    farmerCreditScore:          farmer.farmerCreditScore,
+    acceptFarmerDisbursement:   farmer.acceptFarmerDisbursement,
+    queueStaffB2CForFarmer:     farmer.queueStaffB2CForFarmer,
+
+    // Utilities
+    t,
+  }
 }

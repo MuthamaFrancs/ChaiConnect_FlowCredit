@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { MpesaBadge } from '../../components/MpesaBadge'
 import { Money } from '../../components/Money'
 import { fetchMpesaFeed, fetchSmsLog, simulateC2B, checkTransactionStatus } from '../../lib/api'
-import { MPESA_FEED } from '../../data/seed'
+import type { MpesaTx } from '../../types'
 
-type TxRow = (typeof MPESA_FEED)[0]
+type TxRow = MpesaTx & { _type?: string }
 type Filter = 'All' | 'B2C' | 'C2B' | 'SMS' | 'Failed'
 
 export function FlowCreditTransactionsPage() {

@@ -2,15 +2,15 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { MpesaBadge } from '../components/MpesaBadge'
 import { fetchFarmers, registerFarmer } from '../lib/api'
-import { FARMERS } from '../data/seed'
 import { useApp } from '../context/AppProvider'
+import type { Farmer } from '../types'
 
 export function FarmersPage() {
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
   const [step, setStep] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [farmers, setFarmers] = useState(FARMERS)
+  const [farmers, setFarmers] = useState<Farmer[]>([])
   const [form, setForm] = useState({ name: '', phone: '', nationalId: '', factory: '', zone: '', crop: '' })
   const { pushToast } = useApp()
 
@@ -18,7 +18,7 @@ export function FarmersPage() {
     void (async () => {
       setLoading(true)
       const data = await fetchFarmers()
-      setFarmers(data as typeof FARMERS)
+      setFarmers(data)
       setLoading(false)
     })()
   }, [])
@@ -35,7 +35,7 @@ export function FarmersPage() {
       factory: form.factory || 'Kiambu Tea Factory', zone: form.zone || 'North Ridge',
     })
     if (result?.farmer) {
-      setFarmers(prev => [result.farmer as typeof FARMERS[0], ...prev])
+      setFarmers(prev => [result.farmer as Farmer, ...prev])
       pushToast(`✅ Farmer "${form.name}" registered successfully`)
     } else {
       pushToast('❌ Registration failed — check backend')
@@ -62,7 +62,7 @@ export function FarmersPage() {
           <option>All factories</option>
           {[...new Set(farmers.map(f => f.factory))].map(x => <option key={x}>{x}</option>)}
         </select>
-        <button className="btn btn-ghost" onClick={async () => { setLoading(true); setFarmers(await fetchFarmers() as typeof FARMERS); setLoading(false) }}>↻ Refresh</button>
+        <button className="btn btn-ghost" onClick={async () => { setLoading(true); setFarmers(await fetchFarmers()); setLoading(false) }}>↻ Refresh</button>
       </div>
 
       {loading ? (

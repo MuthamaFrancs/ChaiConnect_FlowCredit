@@ -5,16 +5,16 @@ import { MpesaBadge } from '../components/MpesaBadge'
 import { Money } from '../components/Money'
 import { PaymentStatusPill } from '../components/PaymentStatusPill'
 import { fetchFarmer, fetchFarmerDeliveries, fetchMpesaFeed, fetchCreditScore } from '../lib/api'
-import { FARMERS, MPESA_FEED } from '../data/seed'
+import type { Farmer, MpesaTx } from '../types'
 
 const TABS = ['Deliveries', 'Payment ledger', 'Credit profile', 'M-Pesa activity'] as const
 
 export function FarmerProfilePage() {
   const { id } = useParams()
   const [tab, setTab] = useState<(typeof TABS)[number]>('Deliveries')
-  const [farmer, setFarmer] = useState<(typeof FARMERS)[0] | null>(null)
+  const [farmer, setFarmer] = useState<Farmer | null>(null)
   const [deliveries, setDeliveries] = useState<any[]>([])
-  const [mpesaFeed, setMpesaFeed] = useState<typeof MPESA_FEED>([])
+  const [mpesaFeed, setMpesaFeed] = useState<MpesaTx[]>([])
   const [creditData, setCreditData] = useState<{
     score: number; grade: string; maxLoanAmount: number;
     factors: Record<string, { score: number; max: number; detail: string }>;
@@ -29,9 +29,9 @@ export function FarmerProfilePage() {
         fetchFarmerDeliveries(id),
         fetchMpesaFeed(),
       ])
-      setFarmer(f as typeof FARMERS[0])
+      setFarmer(f)
       setDeliveries(d)
-      setMpesaFeed(m as typeof MPESA_FEED)
+      setMpesaFeed(m)
     })()
   }, [id])
 
